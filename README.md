@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PISCONAWI IA - Sistema de Análisis de Emisiones
 
 Sistema completo para la detección y análisis de emisiones de vehículos utilizando YOLO, OpenAI Vision API y MySQL.
@@ -163,3 +164,6 @@ Analiza esta imagen de un vehículo y responde exclusivamente en JSON con:
 ## Soporte
 
 Para soporte técnico o preguntas sobre el sistema PISCONAWI IA.
+=======
+# PisquNawi
+>>>>>>> 3fe15f905b64044fe4107ea601a2364685846540
