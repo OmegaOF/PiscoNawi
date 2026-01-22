@@ -18,7 +18,7 @@ git commit -m "Initial commit: Pisco Nawi IA project"
 # Then share the repository URL with others
 ```
 
-### Option 2: Clean Zip Archive
+### Option 2..: Clean Zip Archive
 ```bash
 # Create a clean copy without dependencies
 cd /Users/fortuno/source/pisconawi-ai
