@@ -1,0 +1,47 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Captura from './pages/Captura';
+import Galeria from './pages/Galeria';
+import Analisis from './pages/Analisis';
+import Navbar from './components/Navbar';
+import IntroToLogin from './components/IntroToLogin';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+
+function AppContent() {
+  const { isAuthenticated } = useAuth();
+
+  // Show intro animation every time when not authenticated
+  if (!isAuthenticated) {
+    return <IntroToLogin />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-r from-neutral-bg to-caki">
+      {isAuthenticated && <Navbar />}
+      <main className={isAuthenticated ? 'pt-16' : ''}>
+        <Routes>
+          <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
+          <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
+          <Route path="/captura" element={isAuthenticated ? <Captura /> : <Navigate to="/login" />} />
+          <Route path="/galeria" element={isAuthenticated ? <Galeria /> : <Navigate to="/login" />} />
+          <Route path="/analisis" element={isAuthenticated ? <Analisis /> : <Navigate to="/login" />} />
+          <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
+  );
+}
+
+export default App;

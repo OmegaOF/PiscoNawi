@@ -1,0 +1,40 @@
+# =====================
+# Basura automática Python
+# =====================
+__pycache__/
+*.pyc
+*.pyo
+
+# =====================
+# Entornos virtuales
+# =====================
+venv/
+.venv/
+
+# =====================
+# Configuración de IDE
+# =====================
+.idea/
+.vscode/
+
+# =====================
+# Archivos del sistema operativo
+# =====================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =====================
+# Logs temporales
+# =====================
+*.log
+
+# =====================
+# Modelos y datos MUY PESADOS (opcional)
+# Si decides subirlos, borra estas líneas
+# =====================
+*.pt
+*.pth
+*.onnx
+*.keras
+*.h5
