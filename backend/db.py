@@ -8,15 +8,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:root@localhost:3307/pisco-nawi")
+DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:Smog2026%21@127.0.0.1:3306/pisco-nawi")
 
-# Create engine with explicit connection parameters
 engine = create_engine(
-    "mysql+pymysql://root:root@127.0.0.1:3307/pisco-nawi",
+    DATABASE_URL,
     echo=False,
-    pool_pre_ping=True,  # Test connections before using them
-    pool_recycle=3600,   # Recycle connections after 1 hour
+    pool_pre_ping=True,
+    pool_recycle=3600,
 )
+
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

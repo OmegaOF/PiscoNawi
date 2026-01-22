@@ -9,6 +9,8 @@ import glob
 import threading
 import cv2
 import time
+from typing import Optional
+from pydantic import BaseModel
 from ultralytics import YOLO
 from pydantic import BaseModel
 
@@ -106,7 +108,7 @@ class CapturedImage(BaseModel):
 
 class CaptureStatus(BaseModel):
     is_running: bool
-    process_id: int = None
+    process_id: Optional[int] = None
 
 @router.post("/iniciar", response_model=CaptureStatus)
 async def iniciar_captura(current_user: Usuario = Depends(get_current_user)):
