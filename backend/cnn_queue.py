@@ -20,6 +20,9 @@ _lock = threading.Lock()
 CAPTURA_DIR = os.path.join(os.path.dirname(__file__), "..", "storage", "capturas")
 CAPTURA_DIR = os.path.normpath(CAPTURA_DIR)
 
+# ✅ URL pública donde FastAPI sirve las capturas (main.py monta /capturas)
+PUBLIC_BASE_URL = "http://localhost:8000/capturas"
+
 
 def _get_all_images_fifo():
     exts = ["*.jpg", "*.jpeg", "*.png", "*.webp"]
@@ -31,22 +34,41 @@ def _get_all_images_fifo():
 
 
 def _image_has_prediction(db: Session, image_path: str) -> bool:
-    img = db.query(Imagen).filter(Imagen.ruta_archivo == image_path).first()
+    """
+    ✅ Se revisa por filename_original (no por ruta), porque ahora ruta_archivo será una URL.
+    """
+    filename = os.path.basename(image_path)
+    img = db.query(Imagen).filter(Imagen.filename_original == filename).first()
     if not img:
         return False
     return img.prediccion is not None
 
 
 def _ensure_image_row(db: Session, image_path: str) -> Imagen:
+    """
+    ✅ Guarda ruta_archivo como URL pública: http://localhost:8000/capturas/<filename>
+    ✅ Mantiene filename_original para vincular la imagen al archivo físico.
+    """
     filename = os.path.basename(image_path)
+    public_url = f"{PUBLIC_BASE_URL}/{filename}"
 
-    img = db.query(Imagen).filter(Imagen.ruta_archivo == image_path).first()
+    # Si ya existe por URL pública
+    img = db.query(Imagen).filter(Imagen.ruta_archivo == public_url).first()
     if img:
         return img
 
+    # Si ya existe por filename_original (por si antes se guardó diferente)
+    img = db.query(Imagen).filter(Imagen.filename_original == filename).first()
+    if img:
+        img.ruta_archivo = public_url
+        db.commit()
+        db.refresh(img)
+        return img
+
+    # Crear nuevo registro guardando URL pública
     img = Imagen(
         filename_original=filename,
-        ruta_archivo=image_path,
+        ruta_archivo=public_url,
         fecha_subida=datetime.fromtimestamp(os.path.getmtime(image_path)),
         usuario_id=None,
     )
@@ -81,11 +103,11 @@ def _worker():
             with _lock:
                 current_file = filename
 
-            # 1) asegurar fila en imagenes
+            # 1) asegurar fila en imagenes (guardando URL pública)
             img_row = _ensure_image_row(db, image_path)
 
-            # 2) correr CNN
-            result = predict_smog(image_path)  # debe devolver dict con clase_predicha, confianza, p_smog
+            # 2) correr CNN usando la RUTA LOCAL REAL (no URL)
+            result = predict_smog(image_path)
 
             # 3) guardar predicción (1-1)
             pred = Prediccion(
