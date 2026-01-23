@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from typing import List, Optional
 from pydantic import BaseModel
+from datetime import datetime, date
 
 from auth import get_current_user
 from db import get_db, Usuario, Imagen, Prediccion
@@ -86,7 +87,7 @@ async def analizar_con_ia(
         prediccion.confianza = resultado["nivel_confianza"] / 100.0
         prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
         prediccion.observacion = resultado["descripcion_corta"]
-        prediccion.fecha_prediccion = db.func.now()
+        prediccion.fecha_prediccion = func.now()
 
         # Update license plate if detected
         if resultado.get("placa") and resultado["placa"] != "undefined":
@@ -99,3 +100,89 @@ async def analizar_con_ia(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error en el análisis con IA: {str(e)}")
+
+class BulkAnalysisResult(BaseModel):
+    processed_count: int
+    success_count: int
+    failed_count: int
+    errors: List[str]
+
+@router.post("/analizar-todas-hoy", response_model=BulkAnalysisResult)
+async def analizar_todas_imagenes_hoy(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Process all images uploaded today with AI analysis
+    """
+    # Get today's date (start of day)
+    today = date.today()
+    start_of_day = datetime.combine(today, datetime.min.time())
+
+    # Get all images uploaded today that have predictions
+    images_with_predictions = db.query(Imagen).join(Prediccion).filter(
+        Imagen.fecha_subida >= start_of_day
+    ).all()
+
+    if not images_with_predictions:
+        return BulkAnalysisResult(
+            processed_count=0,
+            success_count=0,
+            failed_count=0,
+            errors=["No hay imágenes para analizar hoy"]
+        )
+
+    processed_count = 0
+    success_count = 0
+    failed_count = 0
+    errors = []
+
+    # Import the OpenAI service
+    from openai_service import analizar_imagen_openai
+
+    for imagen in images_with_predictions:
+        processed_count += 1
+        try:
+            # Get the prediction for this image
+            prediccion = db.query(Prediccion).filter(Prediccion.imagen_id == imagen.id).first()
+            if not prediccion:
+                failed_count += 1
+                errors.append(f"Predicción no encontrada para imagen {imagen.id}")
+                continue
+
+            # Analyze with OpenAI
+            resultado = await analizar_imagen_openai(imagen.ruta_archivo)
+
+            # Update the prediction
+            prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
+            prediccion.confianza = resultado["nivel_confianza"] / 100.0
+            prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
+            prediccion.observacion = resultado["descripcion_corta"]
+            prediccion.fecha_prediccion = func.now()
+
+            # Update license plate if detected
+            if resultado.get("placa") and resultado["placa"] != "undefined":
+                imagen.placa_manual = resultado["placa"]
+
+            success_count += 1
+
+        except Exception as e:
+            failed_count += 1
+            error_msg = str(e) if str(e) else f"Error desconocido (tipo: {type(e).__name__})"
+            errors.append(f"Error procesando imagen {imagen.id}: {error_msg}")
+            db.rollback()  # Rollback any partial changes for this image
+            continue
+
+    # Commit all successful updates
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error guardando cambios: {str(e)}")
+
+    return BulkAnalysisResult(
+        processed_count=processed_count,
+        success_count=success_count,
+        failed_count=failed_count,
+        errors=errors
+    )

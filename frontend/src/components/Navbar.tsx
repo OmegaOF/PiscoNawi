@@ -10,7 +10,8 @@ const Navbar: React.FC = () => {
     { path: '/dashboard', label: 'Panel Principal' },
     { path: '/captura', label: 'Captura de Vehículos' },
     { path: '/galeria', label: 'Galería de Capturas' },
-    { path: '/analisis', label: 'Análisis de Emisiones' },
+    { path: '/analisis', label: 'Análisis Individual' },
+    { path: '/analisis-masivo', label: 'Análisis Masivo' },
   ];
 
   const isActive = (path: string) => location.pathname === path;

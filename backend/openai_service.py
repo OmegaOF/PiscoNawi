@@ -9,6 +9,7 @@ load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_MODEL = "gpt-4o"  # Updated from deprecated gpt-4-vision-preview
 
 async def analizar_imagen_openai(ruta_archivo: str) -> Dict[str, Any]:
     """
@@ -17,12 +18,54 @@ async def analizar_imagen_openai(ruta_archivo: str) -> Dict[str, Any]:
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY no configurada")
 
-    if not os.path.exists(ruta_archivo):
-        raise FileNotFoundError(f"Archivo de imagen no encontrado: {ruta_archivo}")
+    # Check if ruta_archivo is a URL or a file path
+    if ruta_archivo.startswith('http://localhost:8000/capturas/'):
+        # Convert URL back to local file path for efficiency and reliability
+        filename = ruta_archivo.replace('http://localhost:8000/capturas/', '')
+        local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'storage', 'capturas', filename)
+        print(f"Convirtiendo URL a ruta local: {ruta_archivo} -> {local_path}")
 
-    # Leer y codificar la imagen en base64
-    with open(ruta_archivo, "rb") as image_file:
-        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+        if not os.path.exists(local_path):
+            raise FileNotFoundError(f"Archivo de imagen no encontrado en ruta local: {local_path} (desde URL: {ruta_archivo})")
+        try:
+            with open(local_path, "rb") as image_file:
+                image_data = image_file.read()
+                if not image_data:
+                    raise ValueError(f"El archivo de imagen está vacío: {local_path}")
+        except IOError as e:
+            raise Exception(f"Error al leer el archivo: {local_path} - {str(e)}")
+
+    elif ruta_archivo.startswith('http://') or ruta_archivo.startswith('https://'):
+        # Download image from URL (fallback for external URLs)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.get(ruta_archivo)
+                if response.status_code != 200:
+                    raise FileNotFoundError(f"No se pudo descargar la imagen desde: {ruta_archivo} (Status: {response.status_code})")
+                image_data = response.content
+                if not image_data:
+                    raise ValueError(f"La imagen descargada está vacía: {ruta_archivo}")
+            except httpx.RequestError as e:
+                raise Exception(f"Error de conexión al descargar imagen: {ruta_archivo} - {str(e)}")
+    else:
+        # Read from local file
+        if not os.path.exists(ruta_archivo):
+            raise FileNotFoundError(f"Archivo de imagen no encontrado: {ruta_archivo}")
+        try:
+            with open(ruta_archivo, "rb") as image_file:
+                image_data = image_file.read()
+                if not image_data:
+                    raise ValueError(f"El archivo de imagen está vacío: {ruta_archivo}")
+        except IOError as e:
+            raise Exception(f"Error al leer el archivo: {ruta_archivo} - {str(e)}")
+
+    # Codificar la imagen en base64
+    try:
+        base64_image = base64.b64encode(image_data).decode('utf-8')
+        if not base64_image:
+            raise ValueError("Error al codificar la imagen en base64")
+    except Exception as e:
+        raise Exception(f"Error al codificar imagen en base64: {str(e)}")
 
     # Crear el prompt para el análisis
     prompt = """
@@ -48,7 +91,7 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
     }
 
     payload = {
-        "model": "gpt-4-vision-preview",
+        "model": OPENAI_MODEL,
         "messages": [
             {
                 "role": "user",
@@ -69,23 +112,36 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
         "max_tokens": 500
     }
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(OPENAI_API_URL, headers=headers, json=payload)
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            response = await client.post(OPENAI_API_URL, headers=headers, json=payload)
+        except httpx.RequestError as e:
+            raise Exception(f"Error de conexión con OpenAI API: {str(e)}")
 
         if response.status_code != 200:
-            raise Exception(f"Error en API de OpenAI: {response.status_code} - {response.text}")
+            error_text = response.text[:500] if response.text else "Sin detalles del error"
+            raise Exception(f"Error en API de OpenAI: {response.status_code} - {error_text}")
 
-        result = response.json()
+        try:
+            result = response.json()
+        except json.JSONDecodeError as e:
+            raise Exception(f"Respuesta inválida de OpenAI API: {str(e)}")
 
         # Extraer el contenido JSON de la respuesta
+        if not result.get("choices") or len(result["choices"]) == 0:
+            raise Exception("OpenAI API no retornó choices válidas")
+
         content = result["choices"][0]["message"]["content"]
+        if not content:
+            raise Exception("OpenAI API retornó contenido vacío")
 
         try:
             # Intentar parsear el JSON
             analisis = json.loads(content)
             return analisis
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             # Si no es JSON válido, intentar extraer información útil
+            print(f"Advertencia: OpenAI retornó respuesta no-JSON: {content[:200]}...")
             return {
                 "smog_visible": "smog" in content.lower(),
                 "porcentaje_smog": 50,  # valor por defecto
