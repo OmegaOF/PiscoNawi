@@ -117,6 +117,8 @@ async def procesar_cnn(current_user: Usuario = Depends(get_current_user)):
 
 @router.get("/estado-cnn")
 async def estado_cnn(current_user: Usuario = Depends(get_current_user)):
+    return get_status()
+
 
 class BulkAnalysisResult(BaseModel):
     processed_count: int

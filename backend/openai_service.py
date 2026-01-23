@@ -135,17 +135,37 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
         if not content:
             raise Exception("OpenAI API retornó contenido vacío")
 
-        try:
-            # Intentar parsear el JSON
-            analisis = json.loads(content)
-            return analisis
-        except json.JSONDecodeError as e:
-            # Si no es JSON válido, intentar extraer información útil
-            print(f"Advertencia: OpenAI retornó respuesta no-JSON: {content[:200]}...")
-            return {
-                "smog_visible": "smog" in content.lower(),
+        # Intentar extraer y parsear JSON, manejando respuestas con markdown
+        analisis = None
+
+        # Primero intentar extraer JSON de bloques de código markdown
+        import re
+        json_match = re.search(r'```(?:json)?\s*\n(.*?)\n```', content, re.DOTALL)
+        if json_match:
+            json_content = json_match.group(1).strip()
+            try:
+                analisis = json.loads(json_content)
+                print(f"JSON extraído de markdown: {analisis}")
+            except json.JSONDecodeError:
+                print(f"Error parseando JSON extraído de markdown: {json_content}")
+
+        # Si no se encontró JSON en markdown, intentar parsear todo el contenido
+        if analisis is None:
+            try:
+                analisis = json.loads(content)
+                print(f"JSON parseado directamente: {analisis}")
+            except json.JSONDecodeError:
+                print(f"Error parseando JSON directamente: {content[:200]}...")
+
+        # Si aún no hay análisis válido, usar heurística
+        if analisis is None:
+            print(f"Advertencia: OpenAI retornó respuesta no-JSON, usando heurística: {content[:200]}...")
+            analisis = {
+                "smog_visible": "smog" in content.lower() and "false" not in content.lower().split("smog")[1][:20] if "smog" in content.lower() else False,
                 "porcentaje_smog": 50,  # valor por defecto
                 "nivel_confianza": 70,  # valor por defecto
-                "descripcion_corta": content[:200] if len(content) > 200 else content,
+                "descripcion_corta": content.replace('```json\n', '').replace('\n```', '').strip()[:200],
                 "placa": "undefined"
             }
+
+        return analisis
