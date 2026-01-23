@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # PISCONAWI IA - Sistema de Análisis de Emisiones
 
 Sistema completo para la detección y análisis de emisiones de vehículos utilizando YOLO, CNN y MySQL.
@@ -146,4 +146,3 @@ El sistema utiliza CNN para analizar imágenes de vehículos y detectar emisione
 Para soporte técnico o preguntas sobre el sistema PISCONAWI IA.
 =======
 # PisquNawi
->>>>>>> 3fe15f905b64044fe4107ea601a2364685846540
