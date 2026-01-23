@@ -10,8 +10,8 @@ const Dashboard: React.FC = () => {
       icon: '📹',
     },
     {
-      title: 'Análisis de Emisiones',
-      description: 'Analizar imágenes existentes usando IA y actualizar predicciones.',
+      title: 'Visualizador de Resultados CNN',
+      description: 'Visualiza la data existente de las imágenes capturadas usando nuestro CNN.',
       path: '/analisis',
       icon: '📊',
     },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 interface CapturedImage {
@@ -28,6 +28,40 @@ const ProcesarCapturas: React.FC = () => {
     pending: 0,
   });
   const [processingCNN, setProcessingCNN] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  // ✅ Get CNN processing status
+  const loadCnnStatus = useCallback(async () => {
+    try {
+      const res = await axios.get('http://localhost:8000/api/analisis/estado-cnn');
+      setCnnStatus(res.data);
+
+      // Update progress bar based on processing status
+      if (res.data.running) {
+        const total = res.data.processed + res.data.pending;
+        if (total > 0) {
+          const currentProgress = (res.data.processed / total) * 100;
+          setProgress(currentProgress);
+        }
+      } else if (processingCNN) {
+        // Process finished, set to 100%
+        setProgress(100);
+        setTimeout(() => {
+          setProcessingCNN(false);
+          setProgress(0);
+        }, 1000);
+      }
+
+      // If finished, turn off button state
+      if (!res.data.running) {
+        setProcessingCNN(false);
+      }
+    } catch (err) {
+      // If it fails, don't break the UI
+      // (for example if endpoint doesn't exist yet)
+      // console.error('Error getting CNN status:', err);
+    }
+  }, [processingCNN]);
 
   useEffect(() => {
     loadImages();
@@ -38,7 +72,7 @@ const ProcesarCapturas: React.FC = () => {
     }, 1500);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [loadCnnStatus]);
 
   const loadImages = async () => {
     try {
@@ -57,6 +91,7 @@ const ProcesarCapturas: React.FC = () => {
   const startCnnProcessing = async () => {
     try {
       setProcessingCNN(true);
+      setProgress(0);
       setError('');
       await axios.post('http://localhost:8000/api/analisis/procesar-cnn');
       // Refresh status right after starting
@@ -64,24 +99,8 @@ const ProcesarCapturas: React.FC = () => {
     } catch (err: any) {
       console.error('Error starting CNN:', err);
       setProcessingCNN(false);
+      setProgress(0);
       setError(err.response?.data?.detail || 'Error starting CNN processing');
-    }
-  };
-
-  // ✅ Get CNN processing status
-  const loadCnnStatus = async () => {
-    try {
-      const res = await axios.get('http://localhost:8000/api/analisis/estado-cnn');
-      setCnnStatus(res.data);
-
-      // If finished, turn off button state
-      if (!res.data.running) {
-        setProcessingCNN(false);
-      }
-    } catch (err) {
-      // If it fails, don't break the UI
-      // (for example if endpoint doesn't exist yet)
-      // console.error('Error getting CNN status:', err);
     }
   };
 
@@ -140,13 +159,29 @@ const ProcesarCapturas: React.FC = () => {
             </span>
           </div>
 
+          {/* Progress Bar */}
+          {processingCNN && (
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-700">Progreso del procesamiento</span>
+                <span className="text-sm text-gray-600">{Math.round(progress)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-vino h-3 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
           <div className="flex space-x-4 flex-wrap gap-2">
             {/* ✅ CNN button with SAME style (bg-vino) */}
             <button
               onClick={startCnnProcessing}
               disabled={processingCNN || cnnStatus.running}
               className="bg-vino text-white px-6 py-2 rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Procesa todas las capturas pendientes (FIFO 1 por 1)"
+              title="Procesa todas las capturas pendientes"
             >
               {(processingCNN || cnnStatus.running) ? 'Procesando Capturas...' : 'Procesar Capturas (CNN)'}
             </button>
@@ -167,6 +202,13 @@ const ProcesarCapturas: React.FC = () => {
           {error && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
               <p className="text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Success message */}
+          {!cnnStatus.running && processingCNN === false && progress === 0 && cnnStatus.processed > 0 && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-green-700">✅ Procesamiento completado exitosamente</p>
             </div>
           )}
         </div>

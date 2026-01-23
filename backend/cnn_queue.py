@@ -2,8 +2,10 @@ import os
 import glob
 import threading
 import time
-from datetime import datetime
+import asyncio
+from datetime import datetime, date
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from db import SessionLocal, Imagen, Prediccion
 from smog_model import predict_smog  # <- usa tu CNN ya existente
@@ -127,6 +129,9 @@ def _worker():
 
             time.sleep(0.2)
 
+        # ✅ After CNN processing completes, automatically run additional analysis
+        _run_post_processing_analysis(db)
+
     except Exception as e:
         if db:
             db.rollback()
@@ -156,3 +161,80 @@ def get_status():
             "processed": processed_count,
             "pending": pending_count,
         }
+
+
+def _run_post_processing_analysis(db: Session):
+    """
+    Internal function that runs additional analysis after CNN processing completes.
+    This automatically enhances predictions for today's images.
+    """
+    try:
+        from openai_service import analizar_imagen_openai
+        
+        # Get today's date (start of day)
+        today = date.today()
+        start_of_day = datetime.combine(today, datetime.min.time())
+
+        # Get all images uploaded today that have predictions
+        images_with_predictions = db.query(Imagen).join(Prediccion).filter(
+            Imagen.fecha_subida >= start_of_day
+        ).all()
+
+        if not images_with_predictions:
+            print("ℹ️ No hay imágenes para análisis adicional")
+            return
+
+        print(f"🔄 Iniciando análisis adicional de {len(images_with_predictions)} imágenes...")
+        
+        success_count = 0
+        failed_count = 0
+
+        for imagen in images_with_predictions:
+            try:
+                # Get the prediction for this image
+                prediccion = db.query(Prediccion).filter(Prediccion.imagen_id == imagen.id).first()
+                if not prediccion:
+                    failed_count += 1
+                    print(f"⚠️ Predicción no encontrada para imagen {imagen.id}")
+                    continue
+
+                # Analyze with additional service
+                # We need to run async function in sync context
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                resultado = loop.run_until_complete(analizar_imagen_openai(imagen.ruta_archivo))
+                loop.close()
+
+                # Update the prediction
+                prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
+                prediccion.confianza = resultado["nivel_confianza"] / 100.0
+                prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
+                prediccion.observacion = resultado["descripcion_corta"]
+                prediccion.fecha_prediccion = func.now()
+
+                # Update license plate if detected
+                if resultado.get("placa") and resultado["placa"] != "undefined":
+                    imagen.placa_manual = resultado["placa"]
+
+                success_count += 1
+                print(f"✅ Análisis adicional completado para imagen {imagen.id}")
+
+            except Exception as e:
+                failed_count += 1
+                error_msg = str(e) if str(e) else f"Error desconocido (tipo: {type(e).__name__})"
+                print(f"❌ Error en análisis adicional de imagen {imagen.id}: {error_msg}")
+                db.rollback()
+                continue
+
+        # Commit all successful updates
+        try:
+            db.commit()
+            print(f"✅ Análisis adicional finalizado: {success_count} exitosos, {failed_count} fallidos")
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error guardando cambios del análisis adicional: {str(e)}")
+
+    except Exception as e:
+        print(f"❌ Error general en análisis adicional: {str(e)}")
+        if db:
+            db.rollback()
