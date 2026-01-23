@@ -12,29 +12,12 @@ interface CaptureStatus {
   process_id: number | null;
 }
 
-// ✅ NUEVO: estado que devuelve el backend del worker CNN
-interface CnnQueueStatus {
-  running: boolean;
-  current_file: string | null;
-  processed: number;
-  pending: number;
-}
-
 const Captura: React.FC = () => {
   const [status, setStatus] = useState<CaptureStatus>({ is_running: false, process_id: null });
   const [images, setImages] = useState<CapturedImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-
-  // ✅ NUEVO: estado del procesamiento CNN
-  const [cnnStatus, setCnnStatus] = useState<CnnQueueStatus>({
-    running: false,
-    current_file: null,
-    processed: 0,
-    pending: 0,
-  });
-  const [processingCNN, setProcessingCNN] = useState(false);
 
   useEffect(() => {
     checkStatus();
@@ -49,15 +32,6 @@ const Captura: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [status.is_running]);
-
-  // ✅ NUEVO: refrescar estado del CNN siempre (cada 1.5s)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadCnnStatus();
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const checkStatus = async () => {
     try {
@@ -81,37 +55,6 @@ const Captura: React.FC = () => {
     }
   };
 
-  // ✅ NUEVO: iniciar procesamiento CNN (FIFO 1 por 1 en backend)
-  const startCnnProcessing = async () => {
-    try {
-      setProcessingCNN(true);
-      setError('');
-      await axios.post('http://localhost:8000/api/analisis/procesar-cnn');
-      // refresca estado apenas arranca
-      await loadCnnStatus();
-    } catch (err: any) {
-      console.error('Error iniciando CNN:', err);
-      setProcessingCNN(false);
-      setError(err.response?.data?.detail || 'Error al iniciar procesamiento CNN');
-    }
-  };
-
-  // ✅ NUEVO: consultar estado del procesamiento CNN
-  const loadCnnStatus = async () => {
-    try {
-      const res = await axios.get('http://localhost:8000/api/analisis/estado-cnn');
-      setCnnStatus(res.data);
-
-      // si ya terminó, apagamos el estado del botón
-      if (!res.data.running) {
-        setProcessingCNN(false);
-      }
-    } catch (err) {
-      // si falla, no rompas la UI
-      // (por ejemplo si aún no creaste el endpoint)
-      // console.error('Error obteniendo estado CNN:', err);
-    }
-  };
 
   const handleStartCapture = async () => {
     setLoading(true);
@@ -152,24 +95,6 @@ const Captura: React.FC = () => {
     });
   };
 
-  // ✅ NUEVO: helper de estado por imagen (sin borrar nada)
-  const renderCnnBadge = (filename: string) => {
-    // Procesando justo esta
-    if (cnnStatus.running && cnnStatus.current_file === filename) {
-      return <span className="text-blue-600 font-semibold">Procesando...</span>;
-    }
-
-    // Si está corriendo pero no es la actual, hay dos estados posibles:
-    // - Pendiente (aún no llegó)
-    // - Procesada (ya pasó)
-    // Como aún no leemos BD aquí, usamos un label neutro.
-    if (cnnStatus.running && cnnStatus.current_file !== filename) {
-      return <span className="text-gray-500">Pendiente / Procesada</span>;
-    }
-
-    // Si no está corriendo
-    return <span className="text-gray-500">Pendiente / Procesada</span>;
-  };
 
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -204,28 +129,6 @@ const Captura: React.FC = () => {
             >
               {loading ? 'Deteniendo...' : 'Detener Captura'}
             </button>
-
-            {/* ✅ NUEVO: botón CNN con MISMO estilo (bg-vino) */}
-            <button
-              onClick={startCnnProcessing}
-              disabled={processingCNN || cnnStatus.running}
-              className="bg-vino text-white px-6 py-2 rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Procesa todas las capturas pendientes (FIFO 1 por 1)"
-            >
-              {(processingCNN || cnnStatus.running) ? 'Procesando Capturas...' : 'Procesar Capturas (CNN)'}
-            </button>
-
-            {/* ✅ NUEVO: mini indicador de progreso */}
-            <div className="flex items-center text-sm text-gray-600 ml-2">
-              {cnnStatus.running ? (
-                <span>
-                  CNN: {cnnStatus.processed} procesadas • {cnnStatus.pending} pendientes
-                  {cnnStatus.current_file ? ` • Actual: ${cnnStatus.current_file}` : ''}
-                </span>
-              ) : (
-                <span>CNN: en espera</span>
-              )}
-            </div>
           </div>
 
           {error && (
@@ -267,11 +170,6 @@ const Captura: React.FC = () => {
                   <div className="p-3">
                     <p className="text-sm font-medium text-gray-900 truncate">{image.filename}</p>
                     <p className="text-xs text-gray-500">{formatTimestamp(image.timestamp)}</p>
-
-                    {/* ✅ NUEVO: estado CNN por imagen */}
-                    <p className="text-xs mt-2">
-                      {renderCnnBadge(image.filename)}
-                    </p>
                   </div>
                 </div>
               ))}

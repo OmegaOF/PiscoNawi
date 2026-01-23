@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Captura from './pages/Captura';
 import Analisis from './pages/Analisis';
 import AnalisisMasivo from './pages/AnalisisMasivo';
+import ProcesarCapturas from './pages/ProcesarCapturas';
 import Navbar from './components/Navbar';
 import FooterArt from './components/FooterArt';
 import IntroToLogin from './components/IntroToLogin';
@@ -26,6 +27,7 @@ function AppContent() {
           <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
           <Route path="/captura" element={isAuthenticated ? <Captura /> : <Navigate to="/login" />} />
+          <Route path="/procesar-capturas" element={isAuthenticated ? <ProcesarCapturas /> : <Navigate to="/login" />} />
           <Route path="/analisis" element={isAuthenticated ? <Analisis /> : <Navigate to="/login" />} />
           <Route path="/analisis-masivo" element={isAuthenticated ? <AnalisisMasivo /> : <Navigate to="/login" />} />
           <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
