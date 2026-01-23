@@ -9,7 +9,6 @@ import os
 from db import engine, Base, get_db
 from auth import authenticate_user, create_access_token, Token, UserLogin, get_current_user
 from captura import router as captura_router
-from galeria import router as galeria_router
 from analisis import router as analisis_router
 
 # Test database connection and create tables if needed
@@ -44,7 +43,6 @@ app.mount("/capturas", StaticFiles(directory=capturas_path), name="capturas")
 
 # Include routers
 app.include_router(captura_router, prefix="/api/captura", tags=["captura"])
-app.include_router(galeria_router, prefix="/api/galeria", tags=["galeria"])
 app.include_router(analisis_router, prefix="/api/analisis", tags=["analisis"])
 
 @app.post("/api/auth/login", response_model=Token)

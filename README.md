@@ -6,7 +6,6 @@ Sistema completo para la detección y análisis de emisiones de vehículos utili
 ## Características
 
 - **Captura de Vehículos**: Control de procesos YOLO para detección en tiempo real
-- **Galería de Capturas**: Visualización de imágenes capturadas con filtros por fecha
 - **Análisis de Emisiones**: Tabla de análisis con integración de OpenAI Vision API
 - **Autenticación**: Sistema de login seguro con JWT
 - **Interfaz en Español**: UI completa en español con tema beige y vino
@@ -18,12 +17,11 @@ Sistema completo para la detección y análisis de emisiones de vehículos utili
 - `db.py`: Modelos de base de datos SQLAlchemy
 - `auth.py`: Sistema de autenticación JWT
 - `captura.py`: Control de procesos YOLO
-- `galeria.py`: Gestión de galería de imágenes
 - `analisis.py`: Consultas de análisis de emisiones
 - `openai_service.py`: Integración con OpenAI Vision API
 
 ### Frontend (React + Tailwind CSS)
-- Páginas: Login, Dashboard, Captura, Galería, Análisis
+- Páginas: Login, Dashboard, Captura, Análisis
 - Tema: Beige (#F5F0E6) y Vino (#6B1F2B)
 - Autenticación con contexto React
 
@@ -96,11 +94,7 @@ La base de datos MySQL debe contener las siguientes tablas (ya existentes):
 - Ver imágenes capturadas en tiempo real
 - Las imágenes se guardan en `/storage/capturas/`
 
-### 3. Galería de Capturas
-- Visualizar todas las imágenes YOLO
-- Filtrar por rango de fechas
-
-### 4. Análisis de Emisiones
+### 3. Análisis de Emisiones
 - Ver tabla combinada de imagenes + predicciones
 - Botón "Analizar con IA" para cada fila
 - Actualiza predicciones usando OpenAI Vision API
@@ -116,9 +110,6 @@ La base de datos MySQL debe contener las siguientes tablas (ya existentes):
 - `POST /api/captura/detener`: Detener proceso YOLO
 - `GET /api/captura/estado`: Estado del proceso
 - `GET /api/captura/imagenes`: Lista de imágenes capturadas
-
-### Galería
-- `GET /api/galeria/imagenes`: Lista de imágenes con filtros opcionales
 
 ### Análisis
 - `GET /api/analisis/emisiones`: Datos de análisis de emisiones

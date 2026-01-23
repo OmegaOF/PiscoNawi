@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Captura from './pages/Captura';
-import Galeria from './pages/Galeria';
 import Analisis from './pages/Analisis';
 import AnalisisMasivo from './pages/AnalisisMasivo';
 import Navbar from './components/Navbar';
@@ -26,7 +25,6 @@ function AppContent() {
           <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
           <Route path="/captura" element={isAuthenticated ? <Captura /> : <Navigate to="/login" />} />
-          <Route path="/galeria" element={isAuthenticated ? <Galeria /> : <Navigate to="/login" />} />
           <Route path="/analisis" element={isAuthenticated ? <Analisis /> : <Navigate to="/login" />} />
           <Route path="/analisis-masivo" element={isAuthenticated ? <AnalisisMasivo /> : <Navigate to="/login" />} />
           <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />

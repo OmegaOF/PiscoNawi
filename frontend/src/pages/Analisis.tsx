@@ -38,7 +38,7 @@ const Analisis: React.FC = () => {
   const handleAnalizarConIA = async (imagenId: number) => {
     setAnalyzingId(imagenId);
     try {
-      const response = await axios.post(`http://localhost:8000/api/analisis/analizar/${imagenId}`);
+      await axios.post(`http://localhost:8000/api/analisis/analizar/${imagenId}`);
       // Reload data to show updated results
       await loadAnalisisData();
       alert('Análisis completado exitosamente');

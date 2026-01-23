@@ -9,7 +9,6 @@ const Navbar: React.FC = () => {
   const navItems = [
     { path: '/dashboard', label: 'Panel Principal' },
     { path: '/captura', label: 'Captura de Vehículos' },
-    { path: '/galeria', label: 'Galería de Capturas' },
     { path: '/analisis', label: 'Análisis Individual' },
     { path: '/analisis-masivo', label: 'Análisis Masivo' },
   ];

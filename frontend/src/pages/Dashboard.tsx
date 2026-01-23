@@ -10,12 +10,6 @@ const Dashboard: React.FC = () => {
       icon: '📹',
     },
     {
-      title: 'Galería de Capturas',
-      description: 'Ver todas las imágenes capturadas por el sistema YOLO.',
-      path: '/galeria',
-      icon: '🖼️',
-    },
-    {
       title: 'Análisis de Emisiones',
       description: 'Analizar imágenes existentes usando IA y actualizar predicciones.',
       path: '/analisis',
