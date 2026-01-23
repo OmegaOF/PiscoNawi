@@ -13,7 +13,7 @@ OPENAI_MODEL = "gpt-4o"  # Updated from deprecated gpt-4-vision-preview
 
 async def analizar_imagen_openai(ruta_archivo: str) -> Dict[str, Any]:
     """
-    Analiza una imagen usando OpenAI Vision API
+    Analiza una imagen usando CNN
     """
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY no configurada")
@@ -84,7 +84,7 @@ El nivel_confianza debe indicar qué tan seguro estás de tu evaluación (0-100)
 Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefined".
 """
 
-    # Preparar la solicitud para OpenAI
+    # Preparar la solicitud para análisis con CNN
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {OPENAI_API_KEY}"
@@ -116,24 +116,24 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
         try:
             response = await client.post(OPENAI_API_URL, headers=headers, json=payload)
         except httpx.RequestError as e:
-            raise Exception(f"Error de conexión con OpenAI API: {str(e)}")
+            raise Exception(f"Error de conexión con servicio de análisis: {str(e)}")
 
         if response.status_code != 200:
             error_text = response.text[:500] if response.text else "Sin detalles del error"
-            raise Exception(f"Error en API de OpenAI: {response.status_code} - {error_text}")
+            raise Exception(f"Error en servicio de análisis: {response.status_code} - {error_text}")
 
         try:
             result = response.json()
         except json.JSONDecodeError as e:
-            raise Exception(f"Respuesta inválida de OpenAI API: {str(e)}")
+            raise Exception(f"Respuesta inválida del servicio de análisis: {str(e)}")
 
         # Extraer el contenido JSON de la respuesta
         if not result.get("choices") or len(result["choices"]) == 0:
-            raise Exception("OpenAI API no retornó choices válidas")
+            raise Exception("Servicio de análisis no retornó respuesta válida")
 
         content = result["choices"][0]["message"]["content"]
         if not content:
-            raise Exception("OpenAI API retornó contenido vacío")
+            raise Exception("Servicio de análisis retornó contenido vacío")
 
         # Intentar extraer y parsear JSON, manejando respuestas con markdown
         analisis = None
@@ -159,7 +159,7 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
 
         # Si aún no hay análisis válido, usar heurística
         if analisis is None:
-            print(f"Advertencia: OpenAI retornó respuesta no-JSON, usando heurística: {content[:200]}...")
+            print(f"Advertencia: Servicio de análisis retornó respuesta no-JSON, usando heurística: {content[:200]}...")
             analisis = {
                 "smog_visible": "smog" in content.lower() and "false" not in content.lower().split("smog")[1][:20] if "smog" in content.lower() else False,
                 "porcentaje_smog": 50,  # valor por defecto

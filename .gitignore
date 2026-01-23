@@ -54,6 +54,7 @@ pids
 
 # Build outputs
 frontend/build/
+frontend/node_modules/
 dist/
 build/
 

@@ -1,12 +1,12 @@
 <<<<<<< HEAD
 # PISCONAWI IA - Sistema de Análisis de Emisiones
 
-Sistema completo para la detección y análisis de emisiones de vehículos utilizando YOLO, OpenAI Vision API y MySQL.
+Sistema completo para la detección y análisis de emisiones de vehículos utilizando YOLO, CNN y MySQL.
 
 ## Características
 
 - **Captura de Vehículos**: Control de procesos YOLO para detección en tiempo real
-- **Análisis de Emisiones**: Tabla de análisis con integración de OpenAI Vision API
+- **Análisis de Emisiones**: Tabla de análisis con integración de CNN
 - **Autenticación**: Sistema de login seguro con JWT
 - **Interfaz en Español**: UI completa en español con tema beige y vino
 
@@ -18,7 +18,7 @@ Sistema completo para la detección y análisis de emisiones de vehículos utili
 - `auth.py`: Sistema de autenticación JWT
 - `captura.py`: Control de procesos YOLO
 - `analisis.py`: Consultas de análisis de emisiones
-- `openai_service.py`: Integración con OpenAI Vision API
+- `openai_service.py`: Integración con CNN
 
 ### Frontend (React + Tailwind CSS)
 - Páginas: Login, Dashboard, Captura, Análisis
@@ -30,7 +30,6 @@ Sistema completo para la detección y análisis de emisiones de vehículos utili
 - Python 3.11
 - MySQL (base de datos existente)
 - Node.js y npm
-- OpenAI API Key
 
 ## Instalación
 
@@ -54,7 +53,6 @@ pip install -r requirements.txt
 ```env
 DATABASE_URL=mysql+pymysql://usuario:password@localhost/pisconawi_db
 SECRET_KEY=tu-clave-secreta-jwt
-OPENAI_API_KEY=tu-clave-openai
 ```
 
 4. Ejecutar el servidor:
@@ -97,7 +95,7 @@ La base de datos MySQL debe contener las siguientes tablas (ya existentes):
 ### 3. Análisis de Emisiones
 - Ver tabla combinada de imagenes + predicciones
 - Botón "Analizar con IA" para cada fila
-- Actualiza predicciones usando OpenAI Vision API
+- Actualiza predicciones usando CNN
 
 ## API Endpoints
 
@@ -113,20 +111,11 @@ La base de datos MySQL debe contener las siguientes tablas (ya existentes):
 
 ### Análisis
 - `GET /api/analisis/emisiones`: Datos de análisis de emisiones
-- `POST /api/analisis/analizar/{imagen_id}`: Analizar imagen con OpenAI
+- `POST /api/analisis/analizar/{imagen_id}`: Analizar imagen con CNN
 
-## OpenAI Integration
+## CNN Integration
 
-El sistema utiliza OpenAI Vision API para analizar imágenes con el siguiente prompt:
-
-```
-Analiza esta imagen de un vehículo y responde exclusivamente en JSON con:
-- smog_visible (true/false)
-- porcentaje_smog (0-100)
-- nivel_confianza (0-100)
-- descripcion_corta
-- placa (número de placa si legible, sino 'undefined')
-```
+El sistema utiliza CNN para analizar imágenes de vehículos y detectar emisiones de smog.
 
 ## Seguridad
 

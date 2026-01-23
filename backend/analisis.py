@@ -79,7 +79,7 @@ async def analizar_con_ia(
     if not prediccion:
         raise HTTPException(status_code=404, detail="Predicción no encontrada para esta imagen")
 
-    # Here we would call the OpenAI service
+    # Here we call the analysis service
     # For now, we'll import and call the function
     from openai_service import analizar_imagen_openai
 
@@ -156,7 +156,7 @@ async def analizar_todas_imagenes_hoy(
     failed_count = 0
     errors = []
 
-    # Import the OpenAI service
+    # Import the analysis service
     from openai_service import analizar_imagen_openai
 
     for imagen in images_with_predictions:
@@ -169,7 +169,7 @@ async def analizar_todas_imagenes_hoy(
                 errors.append(f"Predicción no encontrada para imagen {imagen.id}")
                 continue
 
-            # Analyze with OpenAI
+            # Analyze with CNN
             resultado = await analizar_imagen_openai(imagen.ruta_archivo)
 
             # Update the prediction

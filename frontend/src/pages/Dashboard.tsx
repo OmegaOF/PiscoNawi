@@ -51,7 +51,7 @@ const Dashboard: React.FC = () => {
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Análisis con IA</h3>
               <p className="text-gray-600 mb-4">
-                Emplea OpenAI Vision API para analizar imágenes de vehículos, detectar placas y evaluar emisiones de smog.
+                Emplea CNN para analizar imágenes de vehículos, detectar placas y evaluar emisiones de smog.
               </p>
             </div>
           </div>

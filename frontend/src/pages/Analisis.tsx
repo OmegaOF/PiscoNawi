@@ -17,7 +17,7 @@ interface AnalisisItem {
 const Analisis: React.FC = () => {
   const [analisisData, setAnalisisData] = useState<AnalisisItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [analyzingId, setAnalyzingId] = useState<number | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     loadAnalisisData();
@@ -35,20 +35,6 @@ const Analisis: React.FC = () => {
     }
   };
 
-  const handleAnalizarConIA = async (imagenId: number) => {
-    setAnalyzingId(imagenId);
-    try {
-      await axios.post(`http://localhost:8000/api/analisis/analizar/${imagenId}`);
-      // Reload data to show updated results
-      await loadAnalisisData();
-      alert('Análisis completado exitosamente');
-    } catch (err: any) {
-      console.error('Error analyzing with AI:', err);
-      alert(`Error en el análisis: ${err.response?.data?.detail || 'Error desconocido'}`);
-    } finally {
-      setAnalyzingId(null);
-    }
-  };
 
   const formatConfidence = (confidence: number) => {
     return `${(confidence * 100).toFixed(2)}%`;
@@ -61,13 +47,13 @@ const Analisis: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <div className="px-4 py-6 sm:px-0">
-        <h1 className="text-3xl font-bold text-vino mb-8">Análisis de Emisiones</h1>
+        <h1 className="text-3xl font-bold text-vino mb-8">Ver Resultados de CNN</h1>
 
         <div className="bg-white rounded-lg shadow-md border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-vino">Análisis de Vehículos</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Tabla combinada de imágenes y predicciones. Haz clic en "Analizar con IA" para actualizar usando OpenAI Vision.
+              Tabla combinada de imágenes y predicciones de CNN.
             </p>
           </div>
 
@@ -103,9 +89,6 @@ const Analisis: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Observación
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acción
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -115,9 +98,10 @@ const Analisis: React.FC = () => {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-12 w-12">
                             <img
-                              className="h-12 w-12 rounded-lg object-cover"
-                              src={`file://${item.ruta_archivo}`}
+                              className="h-12 w-12 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                              src={item.ruta_archivo}
                               alt={item.filename_original}
+                              onClick={() => setSelectedImage(item.ruta_archivo)}
                               onError={(e) => {
                                 // Fallback for file:// protocol issues
                                 e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDMTMuMSAyIDE0IDIuOSAxNCA0VjE2QzE0IDE3LjEgMTMuMSAxOCA5LjkgMTlIMTlDMTguMSAxOSAxNyAyMC4xIDE3IDIxVjIyQzE3IDIzLjEgMTYuMSAyNCAxNSAyNEgxN0MxNS44IDI0IDE1IDIzLjEgMTUgMjJWMTlIMTQuOUMxNS44IDE5IDE2IDE4LjEgMTYgMTdWNFoiIGZpbGw9IiM5Q0E0QUYiLz4KPC9zdmc+';
@@ -154,15 +138,6 @@ const Analisis: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
                         {item.observacion || '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleAnalizarConIA(item.imagen_id)}
-                          disabled={analyzingId === item.imagen_id}
-                          className="bg-vino text-white px-4 py-2 rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                        >
-                          {analyzingId === item.imagen_id ? 'Analizando...' : 'Analizar con IA'}
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -171,6 +146,26 @@ const Analisis: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Image Modal */}
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setSelectedImage(null)}>
+          <div className="max-w-4xl max-h-full p-4">
+            <img
+              src={selectedImage}
+              alt="Imagen ampliada"
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full w-8 h-8 flex items-center justify-center hover:bg-opacity-70"
+              onClick={() => setSelectedImage(null)}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

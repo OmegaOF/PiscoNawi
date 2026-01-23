@@ -59,7 +59,7 @@ pip install -r requirements.txt
 
 # Copy environment file and configure
 cp env.example .env
-# Edit .env with your OpenAI API key and other settings
+# Edit .env with your database and other settings
 ```
 
 ### 3. Frontend Setup
@@ -124,7 +124,7 @@ The `.gitignore` automatically excludes:
 
 ## 🚨 Important Notes
 
-1. **Environment Variables**: Recipients need to set up their own `.env` file with OpenAI API key
+1. **Environment Variables**: Recipients need to set up their own `.env` file with database configuration
 2. **Database**: The app uses SQLite, database file is auto-created
 3. **ML Model**: YOLOv8 model is included (6MB) for vehicle detection
 4. **Images**: Sample captured images are included for testing

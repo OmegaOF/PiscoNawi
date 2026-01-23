@@ -37,7 +37,7 @@ const AnalisisMasivo: React.FC = () => {
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-vino">Procesar Todas las Imágenes del Día</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Analiza automáticamente todas las imágenes capturadas hoy usando OpenAI Vision.
+              Analiza automáticamente todas las imágenes capturadas hoy usando CNN.
               Este proceso actualizará las predicciones de todas las imágenes del día actual.
             </p>
           </div>

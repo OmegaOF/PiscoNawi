@@ -6,6 +6,7 @@ import Captura from './pages/Captura';
 import Analisis from './pages/Analisis';
 import AnalisisMasivo from './pages/AnalisisMasivo';
 import Navbar from './components/Navbar';
+import FooterArt from './components/FooterArt';
 import IntroToLogin from './components/IntroToLogin';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -30,6 +31,7 @@ function AppContent() {
           <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
         </Routes>
       </main>
+      {isAuthenticated && <FooterArt />}
     </div>
   );
 }
