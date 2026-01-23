@@ -118,7 +118,16 @@ const ProcesarCapturas: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <div className="px-4 py-6 sm:px-0">
-        <h1 className="text-3xl font-bold text-vino mb-8">Procesamiento CNN de Capturas</h1>
+        <h1 className="text-3xl font-bold text-vino mb-4">Procesamiento CNN de Capturas</h1>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
+          <p className="text-gray-700 leading-relaxed">
+            Una Red Neuronal Convolucional (CNN) es un tipo avanzado de inteligencia artificial especializada en el procesamiento
+            y análisis de imágenes. Este proceso puede tomar tiempo porque utiliza la CNN para identificar y analizar cada imagen
+            de manera detallada. Nuestra CNN fue entrenada con casi 5000 imágenes recolectadas en campo, lo que le permite
+            detectar con precisión características importantes en las capturas de vehículos.
+          </p>
+        </div>
 
         {/* CNN Processing Control Panel */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-200">

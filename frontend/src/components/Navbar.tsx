@@ -10,7 +10,7 @@ const Navbar: React.FC = () => {
     { path: '/dashboard', label: 'Panel Principal' },
     { path: '/captura', label: 'Captura de Vehículos' },
     { path: '/procesar-capturas', label: 'Procesar Capturas (CNN)' },
-    { path: '/analisis', label: 'Análisis Individual' },
+    { path: '/analisis', label: 'Resultados CNN' },
     { path: '/analisis-masivo', label: 'Análisis Masivo' },
   ];
 
