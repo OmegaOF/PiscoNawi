@@ -136,7 +136,7 @@ const Analisis: React.FC = () => {
                         {formatSmogPercentage(item.p_smog)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
-                        {item.observacion || '-'}
+                        -
                       </td>
                     </tr>
                   ))}
