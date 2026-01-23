@@ -6,7 +6,7 @@ This project is **3GB+ when fully set up** but only **~50MB** in its clean state
 
 ## 📦 Best Way to Share
 
-### Option 1: Git Repository (Recommended)
+### Option 1..: Git Repository (Recommended)
 ```bash
 # Initialize git in your project
 cd /Users/fortuno/source/pisconawi-ai
