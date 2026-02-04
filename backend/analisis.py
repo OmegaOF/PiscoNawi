@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from typing import List, Optional
@@ -7,9 +7,16 @@ from datetime import datetime, date
 
 from cnn_queue import start_queue, get_status
 from auth import get_current_user
-from db import get_db, Usuario, Imagen, Prediccion
+from db import get_db, Usuario, Imagen, Prediccion, Ubicacion
 
 router = APIRouter()
+
+
+class ProcesarCnnBody(BaseModel):
+    """Requerido: ubicación actual para asociar a todas las imágenes procesadas."""
+    lat: float
+    lng: float
+    nombre: Optional[str] = None  # opcional; si no se envía, se puede completar por reverse geocode
 
 class AnalisisItem(BaseModel):
     id: int
@@ -109,9 +116,45 @@ async def analizar_con_ia(
 
 # ✅ ESTOS ENDPOINTS DEBEN ESTAR A NIVEL RAÍZ (NO DENTRO DE OTRA FUNCIÓN)
 
+async def _reverse_geocode_nombre(lat: float, lng: float) -> Optional[str]:
+    """Obtiene nombre/dirección desde Nominatim (OpenStreetMap)."""
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={"lat": lat, "lon": lng, "format": "json"},
+                headers={"User-Agent": "PiscoNawi-App/1.0"},
+            )
+            if r.status_code != 200:
+                return None
+            data = r.json()
+            return data.get("display_name") or None
+    except Exception:
+        return None
+
+
 @router.post("/procesar-cnn")
-async def procesar_cnn(current_user: Usuario = Depends(get_current_user)):
-    start_queue()
+async def procesar_cnn(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    body: ProcesarCnnBody = Body(...),
+):
+    # Crear ubicación con todos los datos posibles (nombre desde UI o reverse geocode)
+    nombre = body.nombre
+    if not nombre or not nombre.strip():
+        nombre = await _reverse_geocode_nombre(body.lat, body.lng)
+    ub = Ubicacion(
+        latitud=body.lat,
+        longitud=body.lng,
+        nombre=nombre.strip() if nombre and nombre.strip() else None,
+    )
+    db.add(ub)
+    db.commit()
+    db.refresh(ub)
+    ubicacion_id = ub.id
+    # Sin tocar la lógica CNN: solo pasamos ubicacion_id para que cada imagen se relacione
+    start_queue(ubicacion_id=ubicacion_id)
     return {"message": "Procesamiento CNN iniciado (FIFO 1 por 1)"}
 
 

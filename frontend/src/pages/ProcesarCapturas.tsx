@@ -1,5 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix default marker icon in react-leaflet (webpack)
+const defaultIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+L.Marker.prototype.options.icon = defaultIcon;
 
 interface CapturedImage {
   filename: string;
@@ -15,10 +28,60 @@ interface CnnQueueStatus {
   pending: number;
 }
 
+interface LocationCoords {
+  lat: number;
+  lng: number;
+}
+
+// Default center (e.g. Lima, Peru)
+const DEFAULT_CENTER: LocationCoords = { lat: -12.0464, lng: -77.0428 };
+
+// Draggable marker that reports position on drag end
+function DraggableMarker({
+  position,
+  setPosition,
+}: {
+  position: LocationCoords;
+  setPosition: (pos: LocationCoords) => void;
+}) {
+  const markerRef = useRef<L.Marker>(null);
+  const eventHandlers = useMemo(
+    () => ({
+      dragend() {
+        const marker = markerRef.current;
+        if (marker != null) {
+          const latlng = marker.getLatLng();
+          setPosition({ lat: latlng.lat, lng: latlng.lng });
+        }
+      },
+    }),
+    [setPosition]
+  );
+
+  return (
+    <Marker
+      draggable
+      eventHandlers={eventHandlers}
+      position={[position.lat, position.lng]}
+      ref={markerRef}
+    >
+      <Popup>Arrastra el pin para ajustar la ubicación</Popup>
+    </Marker>
+  );
+}
+
 const ProcesarCapturas: React.FC = () => {
   const [images, setImages] = useState<CapturedImage[]>([]);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // ✅ Current location (page/session) — from GPS or manual map; required to process
+  const [location, setLocation] = useState<LocationCoords | null>(null);
+  const [locationDisplayName, setLocationDisplayName] = useState<string | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [mapPinPosition, setMapPinPosition] = useState<LocationCoords>(DEFAULT_CENTER);
 
   // ✅ CNN processing state
   const [cnnStatus, setCnnStatus] = useState<CnnQueueStatus>({
@@ -29,6 +92,61 @@ const ProcesarCapturas: React.FC = () => {
   });
   const [processingCNN, setProcessingCNN] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  // Reverse geocode to get display name (Nominatim)
+  const fetchDisplayName = useCallback(async (lat: number, lng: number): Promise<string | null> => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { 'Accept': 'application/json', 'User-Agent': 'PiscoNawi-App/1.0' } }
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.display_name || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const setLocationAndFetchName = useCallback(async (coords: LocationCoords) => {
+    setLocation(coords);
+    setLocationDisplayName(null);
+    const name = await fetchDisplayName(coords.lat, coords.lng);
+    setLocationDisplayName(name);
+  }, [fetchDisplayName]);
+
+  // Get current location from browser GPS
+  const fetchLocationFromGPS = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationError('Tu navegador no soporta geolocalización.');
+      return;
+    }
+    setLocationLoading(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocationLoading(false);
+        setLocationAndFetchName(coords);
+      },
+      (err) => {
+        setLocationError(err.message || 'No se pudo obtener la ubicación.');
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }, [setLocationAndFetchName]);
+
+  // Open map modal (use current location or default center)
+  const openMapModal = useCallback(() => {
+    setMapPinPosition(location ?? DEFAULT_CENTER);
+    setMapModalOpen(true);
+  }, [location]);
+
+  const confirmMapLocation = useCallback(() => {
+    setLocationAndFetchName(mapPinPosition);
+    setMapModalOpen(false);
+  }, [mapPinPosition, setLocationAndFetchName]);
 
   // ✅ Get CNN processing status
   const loadCnnStatus = useCallback(async () => {
@@ -87,14 +205,19 @@ const ProcesarCapturas: React.FC = () => {
     }
   };
 
-  // ✅ Start CNN processing (FIFO 1 by 1 in backend)
+  // ✅ Start CNN processing (FIFO 1 by 1 in backend). Ubicación actual is required.
   const startCnnProcessing = async () => {
+    if (!location) return;
     try {
       setProcessingCNN(true);
       setProgress(0);
       setError('');
-      await axios.post('http://localhost:8000/api/analisis/procesar-cnn');
-      // Refresh status right after starting
+      const body = {
+        lat: location.lat,
+        lng: location.lng,
+        ...(locationDisplayName ? { nombre: locationDisplayName } : {}),
+      };
+      await axios.post('http://localhost:8000/api/analisis/procesar-cnn', body);
       await loadCnnStatus();
     } catch (err: any) {
       console.error('Error starting CNN:', err);
@@ -175,27 +298,86 @@ const ProcesarCapturas: React.FC = () => {
             </div>
           )}
 
-          <div className="flex space-x-4 flex-wrap gap-2">
-            {/* ✅ CNN button with SAME style (bg-vino) */}
-            <button
-              onClick={startCnnProcessing}
-              disabled={processingCNN || cnnStatus.running}
-              className="bg-vino text-white px-6 py-2 rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Procesa todas las capturas pendientes"
-            >
-              {(processingCNN || cnnStatus.running) ? 'Procesando Capturas...' : 'Procesar Capturas (CNN)'}
-            </button>
+          {/* Require Ubicación actual before processing */}
+          {!location && !locationLoading && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <p className="text-amber-800 text-sm">
+                Debe definir la <strong>Ubicación actual</strong> (Usar GPS o Elegir en mapa) para poder procesar las capturas.
+              </p>
+            </div>
+          )}
 
-            {/* ✅ Mini progress indicator */}
-            <div className="flex items-center text-sm text-gray-600 ml-2">
-              {cnnStatus.running ? (
-                <span>
-                  CNN: {cnnStatus.processed} procesadas • {cnnStatus.pending} pendientes
-                  {cnnStatus.current_file ? ` • Actual: ${cnnStatus.current_file}` : ''}
-                </span>
-              ) : (
-                <span>CNN: en espera</span>
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="flex space-x-4 flex-wrap gap-2 items-center">
+              {/* CNN button: disabled when no location or when processing */}
+              <button
+                onClick={startCnnProcessing}
+                disabled={!location || processingCNN || cnnStatus.running}
+                className="bg-vino text-white px-6 py-2 rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={location ? 'Procesa todas las capturas pendientes' : 'Defina la ubicación actual para procesar'}
+              >
+                {(processingCNN || cnnStatus.running) ? 'Procesando Capturas...' : 'Procesar Capturas (CNN)'}
+              </button>
+
+              <div className="flex items-center text-sm text-gray-600">
+                {cnnStatus.running ? (
+                  <span>
+                    CNN: {cnnStatus.processed} procesadas • {cnnStatus.pending} pendientes
+                    {cnnStatus.current_file ? ` • Actual: ${cnnStatus.current_file}` : ''}
+                  </span>
+                ) : (
+                  <span>CNN: en espera</span>
+                )}
+              </div>
+            </div>
+
+            {/* Ubicación actual: card con todos los datos disponibles */}
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 min-w-[280px]">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ubicación actual</span>
+                {location && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800">Lista</span>
+                )}
+              </div>
+              {locationLoading && (
+                <p className="text-sm text-gray-500">Obteniendo ubicación...</p>
               )}
+              {locationError && (
+                <p className="text-sm text-amber-600">{locationError}</p>
+              )}
+              {location && !locationLoading && (
+                <div className="space-y-2 text-sm">
+                  {locationDisplayName && (
+                    <p className="text-gray-800 font-medium leading-snug" title="Dirección / lugar">
+                      {locationDisplayName}
+                    </p>
+                  )}
+                  <p className="text-gray-600 font-mono text-xs">
+                    {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                  </p>
+                  <p className="text-gray-500 text-xs">Coordenadas (lat, lng)</p>
+                </div>
+              )}
+              {!location && !locationLoading && !locationError && (
+                <p className="text-gray-500 text-sm">No definida</p>
+              )}
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={fetchLocationFromGPS}
+                  disabled={locationLoading}
+                  className="text-sm bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Usar GPS
+                </button>
+                <button
+                  type="button"
+                  onClick={openMapModal}
+                  className="text-sm bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-100"
+                >
+                  Elegir en mapa
+                </button>
+              </div>
             </div>
           </div>
 
@@ -264,6 +446,61 @@ const ProcesarCapturas: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Map modal: drag pin to set location */}
+        {mapModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+              <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-vino">Elegir ubicación en el mapa</h3>
+                <div className="flex gap-2">
+                  <span className="text-sm text-gray-600 self-center">
+                    {mapPinPosition.lat.toFixed(5)}, {mapPinPosition.lng.toFixed(5)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMapModalOpen(false)}
+                    className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                    aria-label="Cerrar"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+              <div className="relative w-full" style={{ height: '450px' }}>
+                <MapContainer
+                  center={[mapPinPosition.lat, mapPinPosition.lng]}
+                  zoom={14}
+                  style={{ height: '100%', width: '100%' }}
+                  className="rounded-b-lg z-0"
+                  scrollWheelZoom
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <DraggableMarker position={mapPinPosition} setPosition={setMapPinPosition} />
+                </MapContainer>
+              </div>
+              <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMapModalOpen(false)}
+                  className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmMapLocation}
+                  className="px-4 py-2 rounded bg-vino text-white hover:bg-opacity-90"
+                >
+                  Confirmar ubicación
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

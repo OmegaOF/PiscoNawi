@@ -34,6 +34,20 @@ class Usuario(Base):
     # Relationship
     imagenes = relationship("Imagen", back_populates="usuario")
 
+
+class Ubicacion(Base):
+    __tablename__ = "ubicaciones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(255), nullable=True)
+    latitud = Column(Float, nullable=False)
+    longitud = Column(Float, nullable=False)
+    creado_en = Column(DateTime, default=datetime.utcnow)
+
+    # Relationship
+    imagenes = relationship("Imagen", back_populates="ubicacion")
+
+
 class Imagen(Base):
     __tablename__ = "imagenes"
 
@@ -43,9 +57,11 @@ class Imagen(Base):
     placa_manual = Column(String(255), nullable=True)
     fecha_subida = Column(DateTime, nullable=False)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    ubicacion_id = Column(Integer, ForeignKey("ubicaciones.id"), nullable=True)
 
     # Relationships
     usuario = relationship("Usuario", back_populates="imagenes")
+    ubicacion = relationship("Ubicacion", back_populates="imagenes")
     prediccion = relationship("Prediccion", back_populates="imagen", uselist=False)
 
 class Prediccion(Base):
