@@ -1,34 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import Login from '../pages/Login';
 
 type Phase = 'intro' | 'transition' | 'login';
 
 const IntroToLogin: React.FC = () => {
   const [phase, setPhase] = useState<Phase>('intro');
+  const [videoEnded, setVideoEnded] = useState(false);
 
   const handleContinue = useCallback(() => {
     if (phase === 'intro') {
       setPhase('transition');
-      // After transition animation completes, show login
       setTimeout(() => {
         setPhase('login');
-      }, 800); // Transition duration
+      }, 800);
     }
   }, [phase]);
 
-  useEffect(() => {
-    // Auto transition after 12 seconds if still on intro (much longer animation - triple the time)
-    if (phase === 'intro') {
-      const timer = setTimeout(() => {
-        handleContinue();
-      }, 12000);
-      return () => clearTimeout(timer);
-    }
-  }, [phase, handleContinue]);
-
-  const handleSkip = () => {
+  const handleSkip = useCallback(() => {
     setPhase('login');
-  };
+  }, []);
+
+  const handleVideoEnded = useCallback(() => {
+    setVideoEnded(true);
+  }, []);
 
   if (phase === 'login') {
     return <Login />;
@@ -36,52 +30,79 @@ const IntroToLogin: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-neutral-bg overflow-hidden">
-      {/* Intro Splash Screen */}
+      {/* Intro Splash Screen - Fullscreen video background */}
       {phase === 'intro' && (
-        <div className="fixed inset-0 flex flex-col items-center justify-center">
-          {/* Background gradient */}
-          <div className="absolute inset-0 bg-gradient-to-r from-neutral-bg to-caki opacity-80" />
+        <div
+          className="fixed inset-0 flex flex-col items-center justify-center"
+          style={{ width: '100vw', height: '100vh' }}
+        >
+          {/* Fullscreen video background - covers viewport, freezes on last frame when ended */}
+          <video
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ width: '100vw', height: '100vh', objectFit: 'cover' }}
+            src="/video/intro-pisconawi.mp4"
+            autoPlay
+            muted
+            playsInline
+            onEnded={handleVideoEnded}
+          />
 
-          {/* Skip button */}
+          {/* Subtle dark overlay for readability */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            aria-hidden
+          />
+
+          {/* Skip button - always visible */}
           <button
             onClick={handleSkip}
-            className="absolute top-6 right-6 text-text-muted hover:text-text-dark transition-colors duration-200 text-sm z-20"
+            className="absolute top-6 right-6 text-white/90 hover:text-white transition-colors duration-200 text-sm z-20 drop-shadow-md"
           >
             Saltar
           </button>
 
-          {/* Content Container */}
-          <div className="relative z-10 w-full max-w-7xl px-8">
-            {/* Hero Content */}
-            <div className="flex items-center justify-between mb-12">
-              {/* Left side - Text */}
-              <div className="flex-1 pr-8 animate-fade-in-up">
-                <h1 className="text-5xl md:text-6xl font-bold text-text-dark mb-4">
-                  Pisco Nawi IA
-                </h1>
-                <h2 className="text-xl md:text-2xl text-text-muted mb-2">
-                  Sistema Inteligente de Detección de Smog
-                </h2>
-                <p className="text-text-muted text-lg">
-                  Monitoreo y detección en tiempo real
-                </p>
-              </div>
+          {/* Centered overlay content */}
+          <div className="relative z-10 flex flex-col items-center justify-center flex-1 w-full px-4">
+            {/* Site title - visible while video plays and after */}
+            <h1 className="text-4xl md:text-6xl font-bold text-white text-center drop-shadow-lg mb-2">
+              Pisco Nawi IA
+            </h1>
+            <h2 className="text-lg md:text-xl text-white/90 text-center drop-shadow-md mb-8">
+              Sistema Inteligente de Detección de Smog
+            </h2>
+            <div className="mb-10 flex justify-center">
+              <div className="w-fit rounded-2xl bg-black/30 px-5 py-3 backdrop-blur-sm ring-1 ring-white/10 shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
+                <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-6">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[11px] md:text-xs font-medium tracking-[0.16em] uppercase text-white/65">
+                      Autor
+                    </span>
+                    <span className="text-sm md:text-base font-semibold text-white">
+                      Jose Pedro Ortuño Flores
+                    </span>
+                  </div>
 
-              {/* Right side - Image */}
-              <div className="flex-1 flex justify-center animate-fade-in-scale">
-              <img
-                src="/vermilion-3.png"
-                alt="Pisco Nawi Bird Flying"
-                className="w-[640px] h-[640px] md:w-[768px] md:h-[768px] object-contain"
-              />
+                  <div className="hidden sm:block h-4 w-px bg-white/15" aria-hidden />
+
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[11px] md:text-xs font-medium tracking-[0.16em] uppercase text-white/65">
+                      Tutor
+                    </span>
+                    <span className="text-sm md:text-base font-semibold text-white">
+                      Ing. Jimenez Velasco Richard
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Continue button */}
-            <div className="flex justify-center animate-fade-in-up" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
+            {/* Continue button - hidden until video ends, then smooth fade-in */}
+            <div
+              className={`flex justify-center ${videoEnded ? 'animate-fade-in-button' : 'opacity-0 pointer-events-none'}`}
+            >
               <button
                 onClick={handleContinue}
-                className="bg-rojo-tinto text-white px-8 py-3 rounded-lg font-medium hover:bg-opacity-90 transition-colors duration-200"
+                className="bg-rojo-tinto text-white px-8 py-3 rounded-lg font-medium hover:bg-opacity-90 transition-colors duration-200 shadow-lg"
               >
                 Continuar
               </button>
@@ -94,14 +115,21 @@ const IntroToLogin: React.FC = () => {
       {phase === 'transition' && (
         <div className="min-h-screen flex bg-neutral-bg">
           {/* Left Sidebar - Bird moving into position */}
-          <div className="w-2/5 bg-caki flex flex-col items-center justify-center px-8 animate-slide-in-left">
-            <img
-              src="/vermilion.png"
-              alt="Pisco Nawi Bird"
-              className="w-[640px] h-[640px] md:w-[768px] md:h-[768px] object-contain mb-6"
+          <div
+            className="w-2/5 bg-caki flex flex-col items-center justify-center px-8 animate-slide-in-left"
+            style={{ backgroundColor: '#C6B38E', backgroundImage: 'none' }}
+          >
+            <video
+              src="/video/login-animation.mp4"
+              className="w-[640px] h-[640px] md:w-[768px] md:h-[768px] object-contain bg-caki mb-6"
+              style={{ backgroundColor: '#C6B38E', backgroundImage: 'none' }}
+              autoPlay
+              loop
+              muted
+              playsInline
             />
             <h1 className="text-2xl font-bold text-text-dark text-center">
-              Pisco Nawi IA
+              Pisco Nawi IA..
             </h1>
           </div>
 
@@ -139,7 +167,7 @@ const IntroToLogin: React.FC = () => {
                   className="w-full bg-rojo-tinto text-white py-3 px-4 rounded-md font-medium hover:bg-opacity-90 transition-colors duration-200"
                   disabled
                 >
-                  Iniciar Sesión
+                  Iniciar Sesión 1
                 </button>
               </div>
             </div>
