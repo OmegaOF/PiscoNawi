@@ -23,7 +23,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gradient-to-r from-neutral-bg to-caki">
       {isAuthenticated && <Navbar />}
-      <main className={isAuthenticated ? 'pt-16' : ''}>
+      <main className={isAuthenticated ? 'pt-20' : ''}>
         <Routes>
           <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />

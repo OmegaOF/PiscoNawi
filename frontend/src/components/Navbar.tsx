@@ -19,8 +19,8 @@ const Navbar: React.FC = () => {
   return (
     <nav className="bg-rojo-tinto text-white shadow-lg fixed top-0 left-0 right-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
+        <div className="flex justify-between items-center min-h-20 py-3">
+          <div className="flex items-center min-w-0 flex-1">
             <div className="flex-shrink-0 flex items-center">
               <img
                 src="/vermilion-2.png"
@@ -29,13 +29,13 @@ const Navbar: React.FC = () => {
               />
               <h1 className="text-xl font-bold">PISCONAWI IA</h1>
             </div>
-            <div className="hidden md:block ml-10">
-              <div className="flex items-baseline space-x-4">
+            <div className="hidden md:block ml-8 min-w-0 flex-1">
+              <div className="flex items-center flex-nowrap gap-2">
                 {navItems.map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                    className={`whitespace-nowrap px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                       isActive(item.path)
                         ? 'bg-neutral-bg text-rojo-tinto'
                         : 'text-white hover:bg-neutral-bg hover:text-rojo-tinto'
