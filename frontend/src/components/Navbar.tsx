@@ -11,6 +11,7 @@ const Navbar: React.FC = () => {
     { path: '/captura', label: 'Captura de Vehículos' },
     { path: '/procesar-capturas', label: 'Procesar Capturas (CNN)' },
     { path: '/analisis', label: 'Resultados CNN' },
+    { path: '/reportes', label: 'Reportes' },
   ];
 
   const isActive = (path: string) => location.pathname === path;

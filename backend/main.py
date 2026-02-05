@@ -10,6 +10,7 @@ from db import engine, Base, get_db
 from auth import authenticate_user, create_access_token, Token, UserLogin, get_current_user
 from captura import router as captura_router
 from analisis import router as analisis_router
+from reports import router as reports_router
 
 # Test database connection and create tables if needed
 try:
@@ -44,6 +45,7 @@ app.mount("/capturas", StaticFiles(directory=capturas_path), name="capturas")
 # Include routers
 app.include_router(captura_router, prefix="/api/captura", tags=["captura"])
 app.include_router(analisis_router, prefix="/api/analisis", tags=["analisis"])
+app.include_router(reports_router, prefix="/api/reports", tags=["reports"])
 
 @app.post("/api/auth/login", response_model=Token)
 async def login(form_data: UserLogin, db: Session = Depends(get_db)):
