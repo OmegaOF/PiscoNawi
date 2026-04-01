@@ -11,6 +11,9 @@ from auth import authenticate_user, create_access_token, Token, UserLogin, get_c
 from captura import router as captura_router
 from analisis import router as analisis_router
 from reports import router as reports_router
+from catalogos import router as catalogos_router
+from dispositivos import router as dispositivos_router
+from operator_reviews import router as operator_reviews_router
 
 # Test database connection and create tables if needed
 try:
@@ -29,7 +32,7 @@ app = FastAPI(title="PISCONAWI IA API", version="1.0.0")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,6 +49,9 @@ app.mount("/capturas", StaticFiles(directory=capturas_path), name="capturas")
 app.include_router(captura_router, prefix="/api/captura", tags=["captura"])
 app.include_router(analisis_router, prefix="/api/analisis", tags=["analisis"])
 app.include_router(reports_router, prefix="/api/reports", tags=["reports"])
+app.include_router(catalogos_router, prefix="/api/catalogos", tags=["catalogos"])
+app.include_router(dispositivos_router, prefix="/api/dispositivos", tags=["dispositivos"])
+app.include_router(operator_reviews_router, prefix="/api/operator", tags=["operator"])
 
 @app.post("/api/auth/login", response_model=Token)
 async def login(form_data: UserLogin, db: Session = Depends(get_db)):
@@ -70,7 +76,3 @@ async def get_current_user_info(current_user = Depends(get_current_user)):
 @app.get("/")
 async def root():
     return {"message": "PISCONAWI IA API"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
