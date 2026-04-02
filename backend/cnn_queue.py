@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from db import SessionLocal, Imagen, Prediccion
+from db import SessionLocal, Imagen, Prediccion, DispositivoCaptura
 from smog_model import predict_smog  # <- usa tu CNN ya existente
 
 # ======================
@@ -46,18 +46,18 @@ def _image_has_prediction(db: Session, image_path: str) -> bool:
         return False
     return img.prediccion is not None
 
-
 def _ensure_image_row(
     db: Session,
     image_path: str,
     ubicacion_id: Optional[int] = None,
     user_id: Optional[int] = None,
+    dispositivo_id: Optional[int] = None,
 ) -> Imagen:
     """
-    ✅ Guarda ruta_archivo como URL pública: http://localhost:8000/capturas/<filename>
-    ✅ Mantiene filename_original para vincular la imagen al archivo físico.
-    ✅ Opcionalmente asocia la imagen a una ubicación (ubicacion_id).
-    """
+       ✅ Guarda ruta_archivo como URL pública: http://localhost:8000/capturas/<filename>
+       ✅ Mantiene filename_original para vincular la imagen al archivo físico.
+       ✅ Opcionalmente asocia la imagen a una ubicación (ubicacion_id).
+       """
     filename = os.path.basename(image_path)
     public_url = f"{PUBLIC_BASE_URL}/{filename}"
 
@@ -69,13 +69,19 @@ def _ensure_image_row(
             img.ubicacion_id = ubicacion_id
         if user_id is not None and img.usuario_id is None:
             img.usuario_id = user_id
+        if dispositivo_id is not None and img.dispositivo_captura_id is None:
+            img.dispositivo_captura_id = dispositivo_id
         print(f"🧾 _ensure_image_row usuario_id final antes de commit: {img.usuario_id}")
-        if ubicacion_id is not None or (user_id is not None and img.usuario_id is not None):
+        if (
+                ubicacion_id is not None
+                or (user_id is not None and img.usuario_id is not None)
+                or (dispositivo_id is not None and img.dispositivo_captura_id is not None)
+        ):
             db.commit()
             db.refresh(img)
         return img
 
-        # Si ya existe por filename_original (por si antes se guardó diferente)
+    # Si ya existe por filename_original (por si antes se guardó diferente)
     img = db.query(Imagen).filter(Imagen.filename_original == filename).first()
     if img:
         print(f"🧾 _ensure_image_row user_id recibido: {user_id}")
@@ -84,6 +90,8 @@ def _ensure_image_row(
             img.ubicacion_id = ubicacion_id
         if user_id is not None and img.usuario_id is None:
             img.usuario_id = user_id
+        if dispositivo_id is not None and img.dispositivo_captura_id is None:
+            img.dispositivo_captura_id = dispositivo_id
         print(f"🧾 _ensure_image_row usuario_id final antes de commit: {img.usuario_id}")
         db.commit()
         db.refresh(img)
@@ -105,7 +113,25 @@ def _ensure_image_row(
     return img
 
 
-def _worker(ubicacion_id: Optional[int] = None, user_id: Optional[int] = None):
+def _resolve_default_device_id(db: Session) -> Optional[int]:
+    activo = (
+        db.query(DispositivoCaptura.id)
+        .filter(DispositivoCaptura.activo.is_(True))
+        .order_by(DispositivoCaptura.id.asc())
+        .first()
+    )
+    if activo:
+        return activo.id
+    fallback = db.query(DispositivoCaptura.id).order_by(DispositivoCaptura.id.asc()).first()
+    return fallback.id if fallback else None
+
+
+def _worker(
+    ubicacion_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    dispositivo_id: Optional[int] = None,
+):
+
     global queue_running, current_file, processed_count, pending_count
 
     with _lock:
@@ -118,6 +144,8 @@ def _worker(ubicacion_id: Optional[int] = None, user_id: Optional[int] = None):
     db = None
     try:
         db = SessionLocal()
+        if dispositivo_id is None:
+            dispositivo_id = _resolve_default_device_id(db)
 
         files = _get_all_images_fifo()
         pending = [f for f in files if not _image_has_prediction(db, f)]
@@ -132,7 +160,14 @@ def _worker(ubicacion_id: Optional[int] = None, user_id: Optional[int] = None):
 
             # 1) asegurar fila en imagenes (guardando URL pública y opcional ubicación)
             print(f"👷 _worker user_id recibido: {user_id}")
-            img_row = _ensure_image_row(db, image_path, ubicacion_id=ubicacion_id, user_id=user_id)
+            print(f"👷 _worker user_id recibido: {user_id}")
+            img_row = _ensure_image_row(
+                db,
+                image_path,
+                ubicacion_id=ubicacion_id,
+                user_id=user_id,
+                dispositivo_id=dispositivo_id,
+            )
 
             # 2) correr CNN usando la RUTA LOCAL REAL (no URL)
             result = predict_smog(image_path)
@@ -173,10 +208,14 @@ def _worker(ubicacion_id: Optional[int] = None, user_id: Optional[int] = None):
 
 
 
-def start_queue(ubicacion_id: Optional[int] = None, user_id: Optional[int] = None):
+def start_queue(
+    ubicacion_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    dispositivo_id: Optional[int] = None,
+):
     """Inicia la cola FIFO si no está corriendo. Opcionalmente asocia las imágenes a ubicacion_id."""
     print(f"🚀 start_queue user_id recibido: {user_id}")
-    t = threading.Thread(target=_worker, args=(ubicacion_id, user_id), daemon=True)
+    t = threading.Thread(target=_worker, args=(ubicacion_id, user_id, dispositivo_id), daemon=True)
     t.start()
 
 

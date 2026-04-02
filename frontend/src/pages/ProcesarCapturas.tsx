@@ -356,6 +356,9 @@ const ProcesarCapturas: React.FC = () => {
                     {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
                   </p>
                   <p className="text-gray-500 text-xs">Coordenadas (lat, lng)</p>
+                  <p className="text-xs text-gray-600 mt-3 border-t pt-2">
+                    La ciudad y el dispositivo se asignarán automáticamente al procesar la captura.
+                  </p>
                 </div>
               )}
               {!location && !locationLoading && !locationError && (

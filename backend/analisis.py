@@ -7,8 +7,7 @@ from datetime import datetime, date
 
 from cnn_queue import start_queue, get_status
 from auth import get_current_user
-from db import get_db, Usuario, Imagen, Prediccion, Ubicacion
-
+from db import get_db, Usuario, Imagen, Prediccion, Ubicacion, Ciudad, DispositivoCaptura
 router = APIRouter()
 
 
@@ -122,6 +121,34 @@ async def _reverse_geocode_nombre(lat: float, lng: float) -> Optional[str]:
     except Exception:
         return None
 
+def _resolver_ciudad_id(db: Session, lat: float, lng: float) -> Optional[int]:
+    """Resuelve ciudad_id automáticamente usando la ciudad más cercana con coordenadas válidas."""
+    row = (
+        db.query(Ciudad.id)
+        .filter(Ciudad.latitud.isnot(None), Ciudad.longitud.isnot(None))
+        .order_by(
+            func.pow(Ciudad.latitud - lat, 2) + func.pow(Ciudad.longitud - lng, 2)
+        )
+        .first()
+    )
+    return row.id if row else None
+
+
+def _resolver_dispositivo_id(db: Session) -> Optional[int]:
+    """Obtiene dispositivo por defecto (activo primero, si no hay, el primero existente)."""
+    activo = (
+        db.query(DispositivoCaptura.id)
+        .filter(DispositivoCaptura.activo.is_(True))
+        .order_by(DispositivoCaptura.id.asc())
+        .first()
+    )
+    if activo:
+        return activo.id
+
+    fallback = db.query(DispositivoCaptura.id).order_by(DispositivoCaptura.id.asc()).first()
+    return fallback.id if fallback else None
+
+
 
 @router.post("/procesar-cnn")
 async def procesar_cnn(
@@ -131,18 +158,21 @@ async def procesar_cnn(
 ):
     # ✅ SOLO direccion (sin nombre)
     direccion = await _reverse_geocode_nombre(body.lat, body.lng)
+    ciudad_id = _resolver_ciudad_id(db, body.lat, body.lng)
+    dispositivo_id = _resolver_dispositivo_id(db)
 
     ub = Ubicacion(
         latitud=body.lat,
         longitud=body.lng,
         direccion=direccion.strip() if direccion else None,
+        ciudad_id=ciudad_id,
     )
 
     db.add(ub)
     db.commit()
     db.refresh(ub)
 
-    start_queue(ubicacion_id=ub.id, user_id=current_user.id)
+    start_queue(ubicacion_id=ub.id, user_id=current_user.id, dispositivo_id=dispositivo_id)
     return {
         "message": "Procesamiento CNN iniciado (FIFO 1 por 1)",
         "ubicacion_id": ub.id
