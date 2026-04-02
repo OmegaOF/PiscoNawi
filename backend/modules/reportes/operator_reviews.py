@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 
-from modules.auth.auth import get_current_user
+from modules.roles.roles import require_roles
 from db import get_db, Usuario, Imagen, Prediccion
 
 router = APIRouter()
@@ -23,8 +23,8 @@ class HistorialPropioItem(BaseModel):
 
 @router.get("/historial-propio", response_model=List[HistorialPropioItem])
 async def get_historial_propio(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["Usuario operador", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
 ):
     rows = (
         db.query(

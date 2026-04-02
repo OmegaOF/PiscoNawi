@@ -2,15 +2,16 @@
 Reports API: aggregated data for dashboards and charts.
 All endpoints require authentication (get_current_user).
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, date, timedelta
 
-from modules.auth.auth import get_current_user
-from db import get_db, Usuario, Imagen, Prediccion, Ubicacion
+from modules.roles.roles import require_roles
+from db import get_db, Usuario, Imagen, Prediccion, Ubicacion, ReporteGenerado
+
 
 router = APIRouter()
 
@@ -69,6 +70,19 @@ class TablaResumenRow(BaseModel):
     confianza_promedio: float
     p_smog_promedio: float
 
+class ReporteGeneradoItem(BaseModel):
+    id: int
+    nombre_reporte: str
+    fecha_generado: Optional[str]
+    usuario_id: int
+    ruta_archivo: str
+
+
+class ReporteGeneradoCreate(BaseModel):
+    nombre_reporte: str
+    ruta_archivo: str
+
+
 
 def _parse_date(s: Optional[str]) -> Optional[date]:
     if not s:
@@ -81,8 +95,9 @@ def _parse_date(s: Optional[str]) -> Optional[date]:
 
 @router.get("/kpis", response_model=KPIsResponse)
 async def get_kpis(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        user: Usuario = Depends(
+            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
 ):
     """Totals and averages for KPI cards and gauge."""
     total_imagenes = db.query(func.count(Imagen.id)).scalar() or 0
@@ -124,8 +139,9 @@ async def get_kpis(
 
 @router.get("/clase-predicha", response_model=List[ClasePredichaItem])
 async def get_clase_predicha(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        user: Usuario = Depends(
+            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
 ):
     """Counts by predicted class (smog / sin_smog) for pie and bar charts."""
     rows = (
@@ -150,8 +166,9 @@ def _truncate_date(column, agrupar: str):
 
 @router.get("/tendencia-predicciones", response_model=List[TendenciaItem])
 async def get_tendencia_predicciones(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        user: Usuario = Depends(
+            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
     desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
     hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
     agrupar: str = Query("dia", regex="^(dia|semana|mes)$"),
@@ -188,8 +205,9 @@ async def get_tendencia_predicciones(
 
 @router.get("/tendencia-imagenes", response_model=List[TendenciaItem])
 async def get_tendencia_imagenes(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        user: Usuario = Depends(
+            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
     desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
     hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
     agrupar: str = Query("dia", regex="^(dia|semana|mes)$"),
@@ -222,8 +240,9 @@ BUCKETS = [(0.0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.01)]
 
 @router.get("/distribucion-confianza", response_model=List[HistogramBucket])
 async def get_distribucion_confianza(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        user: Usuario = Depends(
+            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
 ):
     """Confidence distribution buckets for histogram."""
     result = []
@@ -243,8 +262,9 @@ async def get_distribucion_confianza(
 
 @router.get("/distribucion-p-smog", response_model=List[HistogramBucket])
 async def get_distribucion_p_smog(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        user: Usuario = Depends(
+            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
 ):
     """p_smog distribution buckets for histogram."""
     result = []
@@ -264,8 +284,9 @@ async def get_distribucion_p_smog(
 
 @router.get("/por-ubicacion", response_model=List[PorUbicacionItem])
 async def get_por_ubicacion(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        user: Usuario = Depends(
+            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
 ):
     """Counts and % smog per location for bar chart and map."""
     sub = (
@@ -307,8 +328,9 @@ async def get_por_ubicacion(
 
 @router.get("/por-usuario", response_model=List[PorUsuarioItem])
 async def get_por_usuario(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        user: Usuario = Depends(
+            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
 ):
     """Image and prediction counts per user for bar chart."""
     sub_img = (
@@ -356,8 +378,9 @@ async def get_por_usuario(
 
 @router.get("/tabla-resumen", response_model=List[TablaResumenRow])
 async def get_tabla_resumen(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        user: Usuario = Depends(
+            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+        db: Session = Depends(get_db),
     desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
     hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
     agrupar: str = Query("dia", regex="^(dia|semana|mes)$"),

@@ -15,7 +15,9 @@ from modules.dispositivos.dispositivos import router as dispositivos_router
 from modules.catalogos.catalogos import router as catalogos_router
 from modules.reportes.operator_reviews import router as operator_reviews_router
 from modules.dispositivos.dispositivos import router as dispositivos_router
-
+from modules.roles.roles import router as roles_router
+from modules.usuarios.usuarios import router as usuarios_router
+from modules.configuraciones.configuraciones import router as configuraciones_router
 
 # Test database connection and create tables if needed
 try:
@@ -52,6 +54,10 @@ app.include_router(analisis_router, prefix="/api/analisis", tags=["analisis"])
 app.include_router(reports_router, prefix="/api/reports", tags=["reports"])
 app.include_router(catalogos_router, prefix="/api/catalogos", tags=["catalogos"])
 app.include_router(dispositivos_router, prefix="/api/dispositivos", tags=["dispositivos"])
+app.include_router(roles_router, prefix="/api/roles", tags=["roles"])
+app.include_router(usuarios_router, prefix="/api/usuarios", tags=["usuarios"])
+app.include_router(configuraciones_router, prefix="/api/configuraciones", tags=["configuraciones"])
+
 
 
 @app.post("/api/auth/login", response_model=Token)
