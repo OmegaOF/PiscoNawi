@@ -1,20 +1,16 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
 from typing import List
 import os
-import subprocess
-import signal
 from datetime import datetime
 import glob
 import threading
 import cv2
 import time
 from typing import Optional
-from pydantic import BaseModel
 from ultralytics import YOLO
 from pydantic import BaseModel
 
-from auth import get_current_user
+from modules.auth.auth import get_current_user
 from db import Usuario
 
 router = APIRouter()
@@ -23,7 +19,7 @@ router = APIRouter()
 capture_process = None
 capture_thread = None
 camera_active = False
-CAPTURA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "storage", "capturas")  # Directory for YOLO captures
+CAPTURA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..", "storage", "capturas")  # Directory for YOLO captures
 CAPTURA_DIR = os.path.normpath(CAPTURA_DIR)
 
 # Load YOLO model for vehicle detection

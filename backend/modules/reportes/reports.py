@@ -9,7 +9,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, date, timedelta
 
-from auth import get_current_user
+from modules.auth.auth import get_current_user
 from db import get_db, Usuario, Imagen, Prediccion, Ubicacion
 
 router = APIRouter()

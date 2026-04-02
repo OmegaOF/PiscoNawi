@@ -8,7 +8,7 @@ from PIL import Image
 # Carga única del modelo
 _model: tf.keras.Model | None = None
 
-MODEL_PATH = Path(__file__).resolve().parent / "models" / "last_model.keras"
+MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "last_model.keras"
 TARGET_SIZE = (224, 224)  # ajusta si tu modelo usa otro tamaño
 
 def load_model_once() -> tf.keras.Model:

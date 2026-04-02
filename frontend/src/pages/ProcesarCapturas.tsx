@@ -298,7 +298,7 @@ const ProcesarCapturas: React.FC = () => {
             </div>
           )}
 
-          {/* Require Ubicación actual before processing */}
+          {/* Require Ubicación actual before pr  ocessing */}
           {!location && !locationLoading && (
             <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
               <p className="text-amber-800 text-sm">

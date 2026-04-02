@@ -5,8 +5,8 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, date
 
-from cnn_queue import start_queue, get_status
-from auth import get_current_user
+from services.cnn_queue import start_queue, get_status
+from modules.auth.auth import get_current_user
 from db import get_db, Usuario, Imagen, Prediccion, Ubicacion, Ciudad, DispositivoCaptura
 router = APIRouter()
 
@@ -83,7 +83,7 @@ async def analizar_con_ia(
     if not prediccion:
         raise HTTPException(status_code=404, detail="Predicción no encontrada para esta imagen")
 
-    from openai_service import analizar_imagen_openai
+    from backend.services.openai_service import analizar_imagen_openai
 
     try:
         resultado = await analizar_imagen_openai(imagen.ruta_archivo)
@@ -216,7 +216,7 @@ async def analizar_todas_imagenes_hoy(
     failed_count = 0
     errors = []
 
-    from openai_service import analizar_imagen_openai
+    from services.openai_service import analizar_imagen_openai
 
     for imagen in images_with_predictions:
         processed_count += 1

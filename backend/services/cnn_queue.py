@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from db import SessionLocal, Imagen, Prediccion, DispositivoCaptura
-from smog_model import predict_smog  # <- usa tu CNN ya existente
+from services.smog_model import predict_smog  # <- usa tu CNN ya existente
 
 # ======================
 # ESTADO GLOBAL
@@ -20,7 +20,7 @@ processed_count = 0
 pending_count = 0
 _lock = threading.Lock()
 
-CAPTURA_DIR = os.path.join(os.path.dirname(__file__), "..", "storage", "capturas")
+CAPTURA_DIR = os.path.join(os.path.dirname(__file__), "../..", "storage", "capturas")
 CAPTURA_DIR = os.path.normpath(CAPTURA_DIR)
 
 # ✅ URL pública donde FastAPI sirve las capturas (main.py monta /capturas)
