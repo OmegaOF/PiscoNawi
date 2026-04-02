@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 
-from auth import get_current_user
+from modules.auth.auth import get_current_user
 from db import get_db, Usuario, Imagen, Prediccion
 
 router = APIRouter()
