@@ -7,6 +7,7 @@ import Analisis from './pages/Analisis';
 import AnalisisMasivo from './pages/AnalisisMasivo';
 import ProcesarCapturas from './pages/ProcesarCapturas';
 import Reportes from './pages/Reportes';
+import HistorialOperador from './pages/HistorialOperador';
 import Navbar from './components/Navbar';
 import FooterArt from './components/FooterArt';
 import IntroToLogin from './components/IntroToLogin';
@@ -32,6 +33,7 @@ function AppContent() {
           <Route path="/analisis" element={isAuthenticated ? <Analisis /> : <Navigate to="/login" />} />
           <Route path="/analisis-masivo" element={isAuthenticated ? <AnalisisMasivo /> : <Navigate to="/login" />} />
           <Route path="/reportes" element={isAuthenticated ? <Reportes /> : <Navigate to="/login" />} />
+          <Route path="/mi-historial" element={isAuthenticated ? <HistorialOperador /> : <Navigate to="/login" />} />
           <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
         </Routes>
       </main>

@@ -12,8 +12,8 @@ from captura import router as captura_router
 from analisis import router as analisis_router
 from reports import router as reports_router
 from catalogos import router as catalogos_router
-from dispositivos import router as dispositivos_router
 from operator_reviews import router as operator_reviews_router
+from dispositivos import router as dispositivos_router
 
 # Test database connection and create tables if needed
 try:
@@ -32,7 +32,7 @@ app = FastAPI(title="PISCONAWI IA API", version="1.0.0")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000"],  # React dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,12 +46,12 @@ os.makedirs(capturas_path, exist_ok=True)
 app.mount("/capturas", StaticFiles(directory=capturas_path), name="capturas")
 
 # Include routers
+app.include_router(operator_reviews_router, prefix="/api/operator", tags=["operator"])
 app.include_router(captura_router, prefix="/api/captura", tags=["captura"])
 app.include_router(analisis_router, prefix="/api/analisis", tags=["analisis"])
 app.include_router(reports_router, prefix="/api/reports", tags=["reports"])
 app.include_router(catalogos_router, prefix="/api/catalogos", tags=["catalogos"])
 app.include_router(dispositivos_router, prefix="/api/dispositivos", tags=["dispositivos"])
-app.include_router(operator_reviews_router, prefix="/api/operator", tags=["operator"])
 
 @app.post("/api/auth/login", response_model=Token)
 async def login(form_data: UserLogin, db: Session = Depends(get_db)):

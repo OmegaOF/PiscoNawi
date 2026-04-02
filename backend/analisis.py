@@ -142,7 +142,7 @@ async def procesar_cnn(
     db.commit()
     db.refresh(ub)
 
-    start_queue(ubicacion_id=ub.id)
+    start_queue(ubicacion_id=ub.id, user_id=current_user.id)
     return {
         "message": "Procesamiento CNN iniciado (FIFO 1 por 1)",
         "ubicacion_id": ub.id

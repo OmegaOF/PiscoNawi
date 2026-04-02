@@ -47,7 +47,12 @@ def _image_has_prediction(db: Session, image_path: str) -> bool:
     return img.prediccion is not None
 
 
-def _ensure_image_row(db: Session, image_path: str, ubicacion_id: Optional[int] = None) -> Imagen:
+def _ensure_image_row(
+    db: Session,
+    image_path: str,
+    ubicacion_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+) -> Imagen:
     """
     ✅ Guarda ruta_archivo como URL pública: http://localhost:8000/capturas/<filename>
     ✅ Mantiene filename_original para vincular la imagen al archivo físico.
@@ -59,18 +64,27 @@ def _ensure_image_row(db: Session, image_path: str, ubicacion_id: Optional[int] 
     # Si ya existe por URL pública
     img = db.query(Imagen).filter(Imagen.ruta_archivo == public_url).first()
     if img:
+        print(f"🧾 _ensure_image_row user_id recibido: {user_id}")
         if ubicacion_id is not None:
             img.ubicacion_id = ubicacion_id
+        if user_id is not None and img.usuario_id is None:
+            img.usuario_id = user_id
+        print(f"🧾 _ensure_image_row usuario_id final antes de commit: {img.usuario_id}")
+        if ubicacion_id is not None or (user_id is not None and img.usuario_id is not None):
             db.commit()
             db.refresh(img)
         return img
 
-    # Si ya existe por filename_original (por si antes se guardó diferente)
+        # Si ya existe por filename_original (por si antes se guardó diferente)
     img = db.query(Imagen).filter(Imagen.filename_original == filename).first()
     if img:
+        print(f"🧾 _ensure_image_row user_id recibido: {user_id}")
         img.ruta_archivo = public_url
         if ubicacion_id is not None:
             img.ubicacion_id = ubicacion_id
+        if user_id is not None and img.usuario_id is None:
+            img.usuario_id = user_id
+        print(f"🧾 _ensure_image_row usuario_id final antes de commit: {img.usuario_id}")
         db.commit()
         db.refresh(img)
         return img
@@ -80,16 +94,18 @@ def _ensure_image_row(db: Session, image_path: str, ubicacion_id: Optional[int] 
         filename_original=filename,
         ruta_archivo=public_url,
         fecha_subida=datetime.fromtimestamp(os.path.getmtime(image_path)),
-        usuario_id=None,
+        usuario_id=user_id,
         ubicacion_id=ubicacion_id,
     )
+    print(f"🧾 _ensure_image_row user_id recibido: {user_id}")
+    print(f"🧾 _ensure_image_row usuario_id final antes de commit: {img.usuario_id}")
     db.add(img)
     db.commit()
     db.refresh(img)
     return img
 
 
-def _worker(ubicacion_id: Optional[int] = None):
+def _worker(ubicacion_id: Optional[int] = None, user_id: Optional[int] = None):
     global queue_running, current_file, processed_count, pending_count
 
     with _lock:
@@ -115,7 +131,8 @@ def _worker(ubicacion_id: Optional[int] = None):
                 current_file = filename
 
             # 1) asegurar fila en imagenes (guardando URL pública y opcional ubicación)
-            img_row = _ensure_image_row(db, image_path, ubicacion_id=ubicacion_id)
+            print(f"👷 _worker user_id recibido: {user_id}")
+            img_row = _ensure_image_row(db, image_path, ubicacion_id=ubicacion_id, user_id=user_id)
 
             # 2) correr CNN usando la RUTA LOCAL REAL (no URL)
             result = predict_smog(image_path)
@@ -155,9 +172,11 @@ def _worker(ubicacion_id: Optional[int] = None):
             pending_count = 0
 
 
-def start_queue(ubicacion_id: Optional[int] = None):
+
+def start_queue(ubicacion_id: Optional[int] = None, user_id: Optional[int] = None):
     """Inicia la cola FIFO si no está corriendo. Opcionalmente asocia las imágenes a ubicacion_id."""
-    t = threading.Thread(target=_worker, args=(ubicacion_id,), daemon=True)
+    print(f"🚀 start_queue user_id recibido: {user_id}")
+    t = threading.Thread(target=_worker, args=(ubicacion_id, user_id), daemon=True)
     t.start()
 
 
