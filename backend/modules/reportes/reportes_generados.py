@@ -35,8 +35,7 @@ class ReporteGeneradoResponse(BaseModel):
     nombre_reporte: str
     fecha_generado: Optional[str]
     usuario_id: int
-    ruta_archivo: str
-
+    ruta_archivo: Optional[str] = None
 
 class ExportarPDFResponse(BaseModel):
     reporte_generado: ReporteGeneradoResponse

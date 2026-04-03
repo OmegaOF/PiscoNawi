@@ -12,11 +12,27 @@ import Navbar from './components/Navbar';
 import FooterArt from './components/FooterArt';
 import IntroToLogin from './components/IntroToLogin';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import { ROLE_ADMIN, ROLE_ANALISTA, ROLE_DEV, ROLE_OPERADOR } from './lib/rbac';
+import UsuariosAdmin from './pages/admin/UsuariosAdmin';
+import RolesAdmin from './pages/admin/RolesAdmin';
+import DispositivosAdmin from './pages/admin/DispositivosAdmin';
+import ConfiguracionesSistema from './pages/admin/ConfiguracionesSistema';
+import Catalogos from './pages/admin/Catalogos';
+import ReportesGenerados from './pages/admin/ReportesGenerados';
+import Perfil from './pages/admin/Perfil';
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+ const { isAuthenticated, loading } = useAuth();
 
-  // Show intro animation every time when not authenticated
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-neutral-bg flex items-center justify-center text-gray-600">
+        Cargando sesión...
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return <IntroToLogin />;
   }
@@ -26,16 +42,25 @@ function AppContent() {
       {isAuthenticated && <Navbar />}
       <main className={isAuthenticated ? 'pt-20' : ''}>
         <Routes>
-          <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
-          <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
-          <Route path="/captura" element={isAuthenticated ? <Captura /> : <Navigate to="/login" />} />
-          <Route path="/procesar-capturas" element={isAuthenticated ? <ProcesarCapturas /> : <Navigate to="/login" />} />
-          <Route path="/analisis" element={isAuthenticated ? <Analisis /> : <Navigate to="/login" />} />
-          <Route path="/analisis-masivo" element={isAuthenticated ? <AnalisisMasivo /> : <Navigate to="/login" />} />
-          <Route path="/reportes" element={isAuthenticated ? <Reportes /> : <Navigate to="/login" />} />
-          <Route path="/mi-historial" element={isAuthenticated ? <HistorialOperador /> : <Navigate to="/login" />} />
-          <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
+                   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/captura" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><Captura /></ProtectedRoute>} />
+          <Route path="/procesar-capturas" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><ProcesarCapturas /></ProtectedRoute>} />
+          <Route path="/analisis" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><Analisis /></ProtectedRoute>} />
+          <Route path="/analisis-masivo" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><AnalisisMasivo /></ProtectedRoute>} />
+          <Route path="/reportes" element={<ProtectedRoute allowedRoles={[ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><Reportes /></ProtectedRoute>} />
+          <Route path="/mi-historial" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ADMIN, ROLE_DEV]}><HistorialOperador /></ProtectedRoute>} />
+
+          <Route path="/usuarios" element={<ProtectedRoute allowedRoles={[ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><UsuariosAdmin /></ProtectedRoute>} />
+          <Route path="/roles" element={<ProtectedRoute allowedRoles={[ROLE_ADMIN, ROLE_DEV]}><RolesAdmin /></ProtectedRoute>} />
+          <Route path="/dispositivos" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><DispositivosAdmin /></ProtectedRoute>} />
+          <Route path="/configuraciones" element={<ProtectedRoute allowedRoles={[ROLE_ADMIN, ROLE_DEV]}><ConfiguracionesSistema /></ProtectedRoute>} />
+          <Route path="/catalogos" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><Catalogos /></ProtectedRoute>} />
+          <Route path="/reportes-generados" element={<ProtectedRoute allowedRoles={[ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><ReportesGenerados /></ProtectedRoute>} />
+          <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
+
+          <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
         </Routes>
+
       </main>
       {isAuthenticated && <FooterArt />}
     </div>

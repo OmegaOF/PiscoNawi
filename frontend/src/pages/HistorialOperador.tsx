@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 
 interface HistorialItem {
   imagen_id: number;
@@ -21,8 +21,8 @@ const HistorialOperador: React.FC = () => {
   useEffect(() => {
     const fetchHistorial = async () => {
       try {
-        const response = await axios.get<HistorialItem[]>(
-          'http://localhost:8000/api/operator/historial-propio'
+        const response = await api.get<HistorialItem[]>(
+            '/operator/historial-propio'
         );
         setHistorial(response.data);
       } catch (err) {

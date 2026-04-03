@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -151,7 +151,7 @@ const ProcesarCapturas: React.FC = () => {
   // ✅ Get CNN processing status
   const loadCnnStatus = useCallback(async () => {
     try {
-      const res = await axios.get('http://localhost:8000/api/analisis/estado-cnn');
+      const res = await api.get('/analisis/estado-cnn');
       setCnnStatus(res.data);
 
       // Update progress bar based on processing status
@@ -195,7 +195,7 @@ const ProcesarCapturas: React.FC = () => {
   const loadImages = async () => {
     try {
       setRefreshing(true);
-      const response = await axios.get('http://localhost:8000/api/captura/imagenes');
+      const response = await api.get('/captura/imagenes');
       // Limit to most recent 20 images to prevent UI overload
       setImages(response.data.slice(0, 20));
     } catch (err) {
@@ -217,7 +217,7 @@ const ProcesarCapturas: React.FC = () => {
         lng: location.lng,
         ...(locationDisplayName ? { nombre: locationDisplayName } : {}),
       };
-      await axios.post('http://localhost:8000/api/analisis/procesar-cnn', body);
+      await api.post('/analisis/procesar-cnn', body);
       await loadCnnStatus();
     } catch (err: any) {
       console.error('Error starting CNN:', err);

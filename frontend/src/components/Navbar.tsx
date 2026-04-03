@@ -1,19 +1,30 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-
+import { hasAnyRole, ROLE_ADMIN, ROLE_ANALISTA, ROLE_DEV, ROLE_OPERADOR } from '../lib/rbac';
 const Navbar: React.FC = () => {
-  const { logout, user } = useAuth();
+  const { logout, user, roles } = useAuth();
   const location = useLocation();
 
   const navItems = [
-    { path: '/dashboard', label: 'Panel Principal' },
-    { path: '/captura', label: 'Captura de Vehículos' },
-    { path: '/procesar-capturas', label: 'Procesar Capturas (CNN)' },
-    { path: '/analisis', label: 'Resultados CNN' },
-    { path: '/reportes', label: 'Reportes' },
-    { path: '/mi-historial', label: 'Mi Historial' },
+ { path: '/dashboard', label: 'Panel Principal', roles: [ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/captura', label: 'Captura de Vehículos', roles: [ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/procesar-capturas', label: 'Procesar Capturas (CNN)', roles: [ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/analisis', label: 'Resultados CNN', roles: [ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/analisis-masivo', label: 'Análisis Masivo', roles: [ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/reportes', label: 'Reportes', roles: [ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/reportes-generados', label: 'Reportes PDF', roles: [ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/mi-historial', label: 'Mi Historial', roles: [ROLE_OPERADOR, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/catalogos', label: 'Catálogos', roles: [ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/dispositivos', label: 'Dispositivos', roles: [ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/usuarios', label: 'Usuarios', roles: [ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+    { path: '/roles', label: 'Roles', roles: [ROLE_ADMIN, ROLE_DEV] },
+    { path: '/configuraciones', label: 'Configuraciones', roles: [ROLE_ADMIN, ROLE_DEV] },
+    { path: '/perfil', label: 'Mi Perfil', roles: [ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
   ];
+
+  const visibleNavItems = navItems.filter((item) => hasAnyRole(roles, item.roles));
+
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -31,8 +42,8 @@ const Navbar: React.FC = () => {
               <h1 className="text-xl font-bold">PISCONAWI IA</h1>
             </div>
             <div className="hidden md:block ml-8 min-w-0 flex-1">
-              <div className="flex items-center flex-nowrap gap-2">
-                {navItems.map((item) => (
+              <div className="flex items-center flex-nowrap gap-2 overflow-x-auto">
+                {visibleNavItems.map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
@@ -64,11 +75,10 @@ const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile menu */}
       <div className="md:hidden">
         <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-rojo-tinto border-t border-neutral-bg">
-          {navItems.map((item) => (
-            <Link
+          {visibleNavItems.map((item) => (
+              <Link
               key={item.path}
               to={item.path}
               className={`block px-3 py-2 rounded-md text-base font-medium ${

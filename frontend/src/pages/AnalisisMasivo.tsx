@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 
 interface BulkAnalysisResult {
   processed_count: number;
@@ -17,7 +17,7 @@ const AnalisisMasivo: React.FC = () => {
     setResult(null);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/analisis/analizar-todas-hoy');
+      const response = await api.post('/analisis/analizar-todas-hoy');
       setResult(response.data);
       alert('Análisis masivo completado exitosamente');
     } catch (err: any) {

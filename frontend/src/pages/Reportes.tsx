@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 import {
   PieChart,
   Pie,
@@ -21,7 +21,7 @@ import {
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const API_BASE = 'http://localhost:8000/api/reports';
+const API_BASE = '/reports';
 
 interface KPIs {
   total_imagenes: number;
@@ -122,16 +122,17 @@ const Reportes: React.FC = () => {
         userRes,
         tablaRes,
       ] = await Promise.all([
-        axios.get<KPIs>(`${API_BASE}/kpis`),
-        axios.get<ClasePredichaItem[]>(`${API_BASE}/clase-predicha`),
-        axios.get<TendenciaItem[]>(`${API_BASE}/tendencia-predicciones`, { params }),
-        axios.get<TendenciaItem[]>(`${API_BASE}/tendencia-imagenes`, { params }),
-        axios.get<HistogramBucket[]>(`${API_BASE}/distribucion-confianza`),
-        axios.get<HistogramBucket[]>(`${API_BASE}/distribucion-p-smog`),
-        axios.get<PorUbicacionItem[]>(`${API_BASE}/por-ubicacion`),
-        axios.get<PorUsuarioItem[]>(`${API_BASE}/por-usuario`),
-        axios.get<TablaResumenRow[]>(`${API_BASE}/tabla-resumen`, { params }),
+        api.get<KPIs>(`${API_BASE}/kpis`),
+        api.get<ClasePredichaItem[]>(`${API_BASE}/clase-predicha`),
+        api.get<TendenciaItem[]>(`${API_BASE}/tendencia-predicciones`, { params }),
+        api.get<TendenciaItem[]>(`${API_BASE}/tendencia-imagenes`, { params }),
+        api.get<HistogramBucket[]>(`${API_BASE}/distribucion-confianza`),
+        api.get<HistogramBucket[]>(`${API_BASE}/distribucion-p-smog`),
+        api.get<PorUbicacionItem[]>(`${API_BASE}/por-ubicacion`),
+        api.get<PorUsuarioItem[]>(`${API_BASE}/por-usuario`),
+        api.get<TablaResumenRow[]>(`${API_BASE}/tabla-resumen`, { params }),
       ]);
+
 
       setKpis(kpisRes.data);
       setClasePredicha(claseRes.data);
@@ -143,7 +144,7 @@ const Reportes: React.FC = () => {
       setPorUsuario(userRes.data);
       setTablaResumen(tablaRes.data);
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
+      const msg = (err as any)?.response?.data?.detail || (err as any)?.message || String(err);
       setError(msg);
     } finally {
       setLoading(false);

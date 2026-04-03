@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 
 interface AnalisisItem {
   id: number;
@@ -26,7 +26,7 @@ const Analisis: React.FC = () => {
   const loadAnalisisData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:8000/api/analisis/emisiones');
+      const response = await api.get('/analisis/emisiones');
       setAnalisisData(response.data);
     } catch (err) {
       console.error('Error loading analysis data:', err);
@@ -136,7 +136,7 @@ const Analisis: React.FC = () => {
                         {formatSmogPercentage(item.p_smog)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
-                        -
+                        {item.observacion || '-'}
                       </td>
                     </tr>
                   ))}

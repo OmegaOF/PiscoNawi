@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 
 interface CapturedImage {
   filename: string;
@@ -35,7 +35,7 @@ const Captura: React.FC = () => {
 
   const checkStatus = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/captura/estado');
+      const response = await api.get('/captura/estado');
       setStatus(response.data);
     } catch (err) {
       console.error('Error checking status:', err);
@@ -45,7 +45,7 @@ const Captura: React.FC = () => {
   const loadImages = async () => {
     try {
       setRefreshing(true);
-      const response = await axios.get('http://localhost:8000/api/captura/imagenes');
+      const response = await api.get('/captura/imagenes');
       // Limit to most recent 20 images to prevent UI overload
       setImages(response.data.slice(0, 20));
     } catch (err) {
@@ -60,7 +60,7 @@ const Captura: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.post('http://localhost:8000/api/captura/iniciar');
+      const response = await api.post('/captura/iniciar');
       setStatus(response.data);
       // Reload images after a short delay
       setTimeout(loadImages, 2000);
@@ -75,7 +75,7 @@ const Captura: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.post('http://localhost:8000/api/captura/detener');
+      const response = await api.post('/captura/detener');
       setStatus(response.data);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error al detener captura');
