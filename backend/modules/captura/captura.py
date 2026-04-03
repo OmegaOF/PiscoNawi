@@ -10,7 +10,7 @@ from typing import Optional
 from ultralytics import YOLO
 from pydantic import BaseModel
 
-from modules.auth.auth import get_current_user
+from modules.roles.roles import require_internal_user
 from db import Usuario
 
 router = APIRouter()
@@ -107,7 +107,7 @@ class CaptureStatus(BaseModel):
     process_id: Optional[int] = None
 
 @router.post("/iniciar", response_model=CaptureStatus)
-async def iniciar_captura(current_user: Usuario = Depends(get_current_user)):
+async def iniciar_captura(current_user: Usuario = Depends(require_internal_user)):
     global capture_thread, camera_active
 
     if camera_active:
@@ -129,7 +129,7 @@ async def iniciar_captura(current_user: Usuario = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"Error al iniciar captura: {str(e)}")
 
 @router.post("/detener", response_model=CaptureStatus)
-async def detener_captura(current_user: Usuario = Depends(get_current_user)):
+async def detener_captura(current_user: Usuario = Depends(require_internal_user)):
     global capture_thread, camera_active
 
     if not camera_active:
@@ -149,13 +149,13 @@ async def detener_captura(current_user: Usuario = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"Error al detener captura: {str(e)}")
 
 @router.get("/estado", response_model=CaptureStatus)
-async def obtener_estado_captura(current_user: Usuario = Depends(get_current_user)):
+async def obtener_estado_captura(current_user: Usuario = Depends(require_internal_user)):
     global camera_active
 
     return CaptureStatus(is_running=camera_active, process_id=os.getpid() if camera_active else None)
 
 @router.get("/logs", response_model=ProcessOutput)
-async def obtener_logs_captura(current_user: Usuario = Depends(get_current_user)):
+async def obtener_logs_captura(current_user: Usuario = Depends(require_internal_user)):
     global camera_active, CAPTURA_DIR
 
     # Check if captura directory exists and count files
@@ -177,7 +177,7 @@ async def obtener_logs_captura(current_user: Usuario = Depends(get_current_user)
     return ProcessOutput(stdout=status_msg, stderr="")
 
 @router.get("/imagenes", response_model=List[CapturedImage])
-async def listar_imagenes_capturadas(current_user: Usuario = Depends(get_current_user)):
+async def listar_imagenes_capturadas(current_user: Usuario = Depends(require_internal_user)):
     if not os.path.exists(CAPTURA_DIR):
         return []
 

@@ -46,7 +46,7 @@ class CiudadUpdate(BaseModel):
 @router.get("/paises", response_model=List[PaisItem])
 async def get_paises(
         current_user: Usuario = Depends(require_roles(
-            ["Usuario operador", "Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            ["Usuario final", "Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
 ):
     rows = db.query(Pais).order_by(Pais.nombre.asc()).all()
@@ -63,8 +63,7 @@ async def get_paises(
 @router.get("/provincias", response_model=List[ProvinciaItem])
 async def get_provincias(
     pais_id: int = Query(...),
-    current_user: Usuario = Depends(require_roles(["Usuario operador", "Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
-        db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["Usuario final", "Usuario analista", "Administrador", "Constructor del sistema"])),        db: Session = Depends(get_db),
 ):
     rows = (
         db.query(Provincia)
@@ -85,8 +84,7 @@ async def get_provincias(
 @router.get("/ciudades", response_model=List[CiudadItem])
 async def get_ciudades(
     provincia_id: int = Query(...),
-    current_user: Usuario = Depends(require_roles(["Usuario operador", "Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
-        db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles(["Usuario final", "Usuario analista", "Administrador", "Constructor del sistema"])),        db: Session = Depends(get_db),
 ):
     rows = (
         db.query(Ciudad)
@@ -108,8 +106,8 @@ async def get_ciudades(
 @router.post("/ciudades", response_model=CiudadItem)
 async def crear_ciudad(
     payload: CiudadCreate,
-    user: Usuario = Depends(require_roles(["Administrador del sistema"])),
-    db: Session = Depends(get_db),
+    user: Usuario = Depends(require_roles(["Administrador"])),
+        db: Session = Depends(get_db),
 ):
     provincia = db.query(Provincia).filter(Provincia.id == payload.provincia_id).first()
     if not provincia:
@@ -137,8 +135,8 @@ async def crear_ciudad(
 async def actualizar_ciudad(
     ciudad_id: int,
     payload: CiudadUpdate,
-    user: Usuario = Depends(require_roles(["Administrador del sistema"])),
-    db: Session = Depends(get_db),
+    user: Usuario = Depends(require_roles(["Administrador"])),
+        db: Session = Depends(get_db),
 ):
     item = db.query(Ciudad).filter(Ciudad.id == ciudad_id).first()
     if not item:

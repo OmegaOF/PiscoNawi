@@ -11,9 +11,9 @@ from modules.roles.roles import require_roles
 
 router = APIRouter()
 
-ADMIN = "Administrador del sistema"
-DEV = "Desarrollador"
-INV = "Investigador ambiental"
+ADMIN = "Administrador"
+DEV = "Constructor del sistema"
+INV = "Usuario analista"
 
 
 class UsuarioItem(BaseModel):

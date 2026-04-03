@@ -23,7 +23,7 @@ class HistorialPropioItem(BaseModel):
 
 @router.get("/historial-propio", response_model=List[HistorialPropioItem])
 async def get_historial_propio(
-    current_user: Usuario = Depends(require_roles(["Usuario operador", "Administrador del sistema", "Desarrollador"])),
+    current_user: Usuario = Depends(require_roles(["Usuario final", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
 ):
     rows = (

@@ -16,6 +16,7 @@ from modules.catalogos.catalogos import router as catalogos_router
 from modules.reportes.operator_reviews import router as operator_reviews_router
 from modules.dispositivos.dispositivos import router as dispositivos_router
 from modules.roles.roles import router as roles_router
+from modules.roles.roles import get_user_roles
 from modules.usuarios.usuarios import router as usuarios_router
 from modules.configuraciones.configuraciones import router as configuraciones_router
 
@@ -73,12 +74,15 @@ async def login(form_data: UserLogin, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/api/auth/me")
-async def get_current_user_info(current_user=Depends(get_current_user)):
+async def get_current_user_info(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
+    roles = get_user_roles(db, current_user.id)
     return {
         "id": current_user.id,
         "nombre": current_user.nombre,
-        "username": current_user.username
+        "username": current_user.username,
+        "roles": roles,
     }
+
 
 @app.get("/")
 async def root():

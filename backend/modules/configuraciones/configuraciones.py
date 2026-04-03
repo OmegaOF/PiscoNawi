@@ -9,9 +9,8 @@ from modules.roles.roles import require_roles
 
 router = APIRouter()
 
-ADMIN = "Administrador del sistema"
-DEV = "Desarrollador"
-
+ADMIN = "Administrador"
+DEV = "Constructor del sistema"
 
 class ConfigItem(BaseModel):
     id: int

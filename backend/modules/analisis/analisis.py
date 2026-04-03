@@ -6,8 +6,7 @@ from pydantic import BaseModel
 from datetime import datetime, date
 
 from services.cnn_queue import start_queue, get_status
-from modules.auth.auth import get_current_user
-from modules.roles.roles import require_roles
+from modules.roles.roles import require_roles, require_internal_user
 from db import get_db, Usuario, Imagen, Prediccion, Ubicacion, Ciudad, DispositivoCaptura
 router = APIRouter()
 
@@ -32,8 +31,8 @@ class AnalisisItem(BaseModel):
 
 @router.get("/emisiones", response_model=List[AnalisisItem])
 async def obtener_analisis_emisiones(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_internal_user),
+        db: Session = Depends(get_db),
 ):
     results = (
         db.query(
@@ -73,8 +72,8 @@ async def obtener_analisis_emisiones(
 @router.post("/analizar/{imagen_id}")
 async def analizar_con_ia(
     imagen_id: int,
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_internal_user),
+        db: Session = Depends(get_db),
 ):
     imagen = db.query(Imagen).filter(Imagen.id == imagen_id).first()
     if not imagen:
@@ -153,8 +152,8 @@ def _resolver_dispositivo_id(db: Session) -> Optional[int]:
 
 @router.post("/procesar-cnn")
 async def procesar_cnn(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_internal_user),
+        db: Session = Depends(get_db),
     body: ProcesarCnnBody = Body(...),
 ):
     # ✅ SOLO direccion (sin nombre)
@@ -181,7 +180,7 @@ async def procesar_cnn(
 
 
 @router.get("/estado-cnn")
-async def estado_cnn(current_user: Usuario = Depends(get_current_user)):
+async def estado_cnn(current_user: Usuario = Depends(require_internal_user)):
     return get_status()
 
 
@@ -249,8 +248,8 @@ class ImagenUpdate(BaseModel):
 
 @router.post("/analizar-todas-hoy", response_model=BulkAnalysisResult)
 async def analizar_todas_imagenes_hoy(
-    current_user: Usuario = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: Usuario = Depends(require_internal_user),
+        db: Session = Depends(get_db)
 ):
     today = date.today()
     start_of_day = datetime.combine(today, datetime.min.time())
@@ -324,7 +323,7 @@ async def analizar_todas_imagenes_hoy(
             clase: Optional[str] = None,
             dispositivo_id: Optional[int] = None,
             user: Usuario = Depends(
-                require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+                require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
             db: Session = Depends(get_db),
     ):
         q = db.query(Imagen, Prediccion).outerjoin(Prediccion, Prediccion.imagen_id == Imagen.id)
@@ -353,176 +352,176 @@ async def analizar_todas_imagenes_hoy(
             for img, pred in rows
         ]
 
-    @router.get("/predicciones", response_model=List[PrediccionItem])
-    async def listar_predicciones(
-            user: Usuario = Depends(
-                require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
-            db: Session = Depends(get_db),
-    ):
-        rows = db.query(Prediccion).order_by(Prediccion.id.desc()).all()
-        return [
-            PrediccionItem(
-                id=r.id,
-                imagen_id=r.imagen_id,
-                clase_predicha=r.clase_predicha,
-                confianza=float(r.confianza),
-                p_smog=float(r.p_smog),
-                fecha_prediccion=r.fecha_prediccion.strftime("%Y-%m-%d %H:%M:%S") if r.fecha_prediccion else None,
+        @router.get("/predicciones", response_model=List[PrediccionItem])
+        async def listar_predicciones(
+                user: Usuario = Depends(
+                    require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
+                db: Session = Depends(get_db),
+        ):
+            rows = db.query(Prediccion).order_by(Prediccion.id.desc()).all()
+            return [
+                PrediccionItem(
+                    id=r.id,
+                    imagen_id=r.imagen_id,
+                    clase_predicha=r.clase_predicha,
+                    confianza=float(r.confianza),
+                    p_smog=float(r.p_smog),
+                    fecha_prediccion=r.fecha_prediccion.strftime("%Y-%m-%d %H:%M:%S") if r.fecha_prediccion else None,
+                )
+                for r in rows
+            ]
+
+            @router.get("/ubicaciones", response_model=List[UbicacionItem])
+            async def listar_ubicaciones(
+                    user: Usuario = Depends(require_roles(["Administrador", "Constructor del sistema"])),
+                    db: Session = Depends(get_db),
+            ):
+                rows = db.query(Ubicacion).order_by(Ubicacion.id.desc()).all()
+                return [
+                    UbicacionItem(
+                        id=r.id,
+                        latitud=float(r.latitud),
+                        longitud=float(r.longitud),
+                        direccion=r.direccion,
+                        ciudad_id=r.ciudad_id,
+                    )
+                    for r in rows
+                ]
+
+            @router.get("/por-dispositivo", response_model=List[AnalisisDispositivoItem])
+            async def analisis_por_dispositivo(
+                    user: Usuario = Depends(
+                        require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
+                    db: Session = Depends(get_db),
+            ):
+                rows = (
+                    db.query(
+                        DispositivoCaptura.id,
+                        DispositivoCaptura.nombre_dispositivo,
+                        func.count(Prediccion.id).label("total"),
+                        func.avg(Prediccion.p_smog).label("avg_p_smog"),
+                    )
+                    .outerjoin(Imagen, Imagen.dispositivo_captura_id == DispositivoCaptura.id)
+                    .outerjoin(Prediccion, Prediccion.imagen_id == Imagen.id)
+                    .group_by(DispositivoCaptura.id, DispositivoCaptura.nombre_dispositivo)
+                    .order_by(DispositivoCaptura.id.asc())
+                    .all()
+                )
+                return [
+                    AnalisisDispositivoItem(
+                        dispositivo_id=r.id,
+                        nombre_dispositivo=r.nombre_dispositivo,
+                        total_predicciones=int(r.total or 0),
+                        promedio_p_smog=float(r.avg_p_smog or 0),
+                    )
+                    for r in rows
+                ]
+
+            @router.put("/predicciones/{prediccion_id}", response_model=PrediccionItem)
+            async def actualizar_prediccion(
+                    prediccion_id: int,
+                    payload: PrediccionUpdate,
+                    user: Usuario = Depends(require_roles(["Administrador", "Constructor del sistema"])),
+                    db: Session = Depends(get_db),
+            ):
+                item = db.query(Prediccion).filter(Prediccion.id == prediccion_id).first()
+                if not item:
+                    raise HTTPException(status_code=404, detail="Predicción no encontrada")
+
+                if payload.clase_predicha is not None:
+                    item.clase_predicha = payload.clase_predicha
+                if payload.confianza is not None:
+                    item.confianza = payload.confianza
+                if payload.p_smog is not None:
+                    item.p_smog = payload.p_smog
+                if payload.observacion is not None:
+                    item.observacion = payload.observacion
+
+                db.commit()
+                db.refresh(item)
+                return PrediccionItem(
+                    id=item.id,
+                    imagen_id=item.imagen_id,
+                    clase_predicha=item.clase_predicha,
+                    confianza=float(item.confianza),
+                    p_smog=float(item.p_smog),
+                    fecha_prediccion=item.fecha_prediccion.strftime(
+                        "%Y-%m-%d %H:%M:%S") if item.fecha_prediccion else None,
+                )
+
+            @router.put("/ubicaciones/{ubicacion_id}", response_model=UbicacionItem)
+            async def actualizar_ubicacion(
+                    ubicacion_id: int,
+                    payload: UbicacionUpdate,
+                    user: Usuario = Depends(require_roles(["Administrador", "Constructor del sistema"])),
+                    db: Session = Depends(get_db),
+            ):
+                item = db.query(Ubicacion).filter(Ubicacion.id == ubicacion_id).first()
+                if not item:
+                    raise HTTPException(status_code=404, detail="Ubicación no encontrada")
+
+                if payload.latitud is not None:
+                    item.latitud = payload.latitud
+                if payload.longitud is not None:
+                    item.longitud = payload.longitud
+                if payload.direccion is not None:
+                    item.direccion = payload.direccion
+                if payload.ciudad_id is not None:
+                    item.ciudad_id = payload.ciudad_id
+
+            db.commit()
+            db.refresh(item)
+            return UbicacionItem(
+                id=item.id,
+                latitud=float(item.latitud),
+                longitud=float(item.longitud),
+                direccion=item.direccion,
+                ciudad_id=item.ciudad_id,
             )
-            for r in rows
-        ]
 
-    @router.get("/ubicaciones", response_model=List[UbicacionItem])
-    async def listar_ubicaciones(
-            user: Usuario = Depends(require_roles(["Administrador del sistema", "Desarrollador"])),
-            db: Session = Depends(get_db),
-    ):
-        rows = db.query(Ubicacion).order_by(Ubicacion.id.desc()).all()
-        return [
-            UbicacionItem(
-                id=r.id,
-                latitud=float(r.latitud),
-                longitud=float(r.longitud),
-                direccion=r.direccion,
-                ciudad_id=r.ciudad_id,
+            @router.put("/imagenes/{imagen_id}", response_model=ImagenProcesadaItem)
+            async def actualizar_imagen(
+                    imagen_id: int,
+                    payload: ImagenUpdate,
+                    user: Usuario = Depends(require_roles(["Administrador", "Constructor del sistema"])),
+                    db: Session = Depends(get_db),
+            ):
+                item = db.query(Imagen).filter(Imagen.id == imagen_id).first()
+                if not item:
+                    raise HTTPException(status_code=404, detail="Imagen no encontrada")
+
+            if payload.placa_manual is not None:
+                item.placa_manual = payload.placa_manual
+            if payload.ubicacion_id is not None:
+                item.ubicacion_id = payload.ubicacion_id
+            if payload.dispositivo_captura_id is not None:
+                item.dispositivo_captura_id = payload.dispositivo_captura_id
+            db.commit()
+            db.refresh(item)
+            pred = db.query(Prediccion).filter(Prediccion.imagen_id == item.id).first()
+            return ImagenProcesadaItem(
+                imagen_id=item.id,
+                ruta_archivo=item.ruta_archivo,
+                fecha_subida=item.fecha_subida.strftime("%Y-%m-%d %H:%M:%S") if item.fecha_subida else None,
+                ubicacion_id=item.ubicacion_id,
+                dispositivo_captura_id=item.dispositivo_captura_id,
+                clase_predicha=pred.clase_predicha if pred else None,
+                p_smog=float(pred.p_smog) if pred else None,
             )
-            for r in rows
-        ]
 
-    @router.get("/por-dispositivo", response_model=List[AnalisisDispositivoItem])
-    async def analisis_por_dispositivo(
-            user: Usuario = Depends(
-                require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
-            db: Session = Depends(get_db),
-    ):
-        rows = (
-            db.query(
-                DispositivoCaptura.id,
-                DispositivoCaptura.nombre_dispositivo,
-                func.count(Prediccion.id).label("total"),
-                func.avg(Prediccion.p_smog).label("avg_p_smog"),
-            )
-            .outerjoin(Imagen, Imagen.dispositivo_captura_id == DispositivoCaptura.id)
-            .outerjoin(Prediccion, Prediccion.imagen_id == Imagen.id)
-            .group_by(DispositivoCaptura.id, DispositivoCaptura.nombre_dispositivo)
-            .order_by(DispositivoCaptura.id.asc())
-            .all()
-        )
-        return [
-            AnalisisDispositivoItem(
-                dispositivo_id=r.id,
-                nombre_dispositivo=r.nombre_dispositivo,
-                total_predicciones=int(r.total or 0),
-                promedio_p_smog=float(r.avg_p_smog or 0),
-            )
-            for r in rows
-        ]
+        @router.delete("/imagenes/{imagen_id}")
+        async def eliminar_imagen(
+                imagen_id: int,
+                user: Usuario = Depends(require_roles(["Administrador"])),
+                db: Session = Depends(get_db),
+        ):
+            item = db.query(Imagen).filter(Imagen.id == imagen_id).first()
+            if not item:
+                raise HTTPException(status_code=404, detail="Imagen no encontrada")
 
-    @router.put("/predicciones/{prediccion_id}", response_model=PrediccionItem)
-    async def actualizar_prediccion(
-            prediccion_id: int,
-            payload: PrediccionUpdate,
-            user: Usuario = Depends(require_roles(["Administrador del sistema", "Desarrollador"])),
-            db: Session = Depends(get_db),
-    ):
-        item = db.query(Prediccion).filter(Prediccion.id == prediccion_id).first()
-        if not item:
-            raise HTTPException(status_code=404, detail="Predicción no encontrada")
-
-        if payload.clase_predicha is not None:
-            item.clase_predicha = payload.clase_predicha
-        if payload.confianza is not None:
-            item.confianza = payload.confianza
-        if payload.p_smog is not None:
-            item.p_smog = payload.p_smog
-        if payload.observacion is not None:
-            item.observacion = payload.observacion
-
-        db.commit()
-        db.refresh(item)
-        return PrediccionItem(
-            id=item.id,
-            imagen_id=item.imagen_id,
-            clase_predicha=item.clase_predicha,
-            confianza=float(item.confianza),
-            p_smog=float(item.p_smog),
-            fecha_prediccion=item.fecha_prediccion.strftime("%Y-%m-%d %H:%M:%S") if item.fecha_prediccion else None,
-        )
-
-    @router.put("/ubicaciones/{ubicacion_id}", response_model=UbicacionItem)
-    async def actualizar_ubicacion(
-            ubicacion_id: int,
-            payload: UbicacionUpdate,
-            user: Usuario = Depends(require_roles(["Administrador del sistema", "Desarrollador"])),
-            db: Session = Depends(get_db),
-    ):
-        item = db.query(Ubicacion).filter(Ubicacion.id == ubicacion_id).first()
-        if not item:
-            raise HTTPException(status_code=404, detail="Ubicación no encontrada")
-
-        if payload.latitud is not None:
-            item.latitud = payload.latitud
-        if payload.longitud is not None:
-            item.longitud = payload.longitud
-        if payload.direccion is not None:
-            item.direccion = payload.direccion
-        if payload.ciudad_id is not None:
-            item.ciudad_id = payload.ciudad_id
-
-        db.commit()
-        db.refresh(item)
-        return UbicacionItem(
-            id=item.id,
-            latitud=float(item.latitud),
-            longitud=float(item.longitud),
-            direccion=item.direccion,
-            ciudad_id=item.ciudad_id,
-        )
-
-    @router.put("/imagenes/{imagen_id}", response_model=ImagenProcesadaItem)
-    async def actualizar_imagen(
-            imagen_id: int,
-            payload: ImagenUpdate,
-            user: Usuario = Depends(require_roles(["Administrador del sistema", "Desarrollador"])),
-            db: Session = Depends(get_db),
-    ):
-        item = db.query(Imagen).filter(Imagen.id == imagen_id).first()
-        if not item:
-            raise HTTPException(status_code=404, detail="Imagen no encontrada")
-
-        if payload.placa_manual is not None:
-            item.placa_manual = payload.placa_manual
-        if payload.ubicacion_id is not None:
-            item.ubicacion_id = payload.ubicacion_id
-        if payload.dispositivo_captura_id is not None:
-            item.dispositivo_captura_id = payload.dispositivo_captura_id
-
-        db.commit()
-        db.refresh(item)
-        pred = db.query(Prediccion).filter(Prediccion.imagen_id == item.id).first()
-        return ImagenProcesadaItem(
-            imagen_id=item.id,
-            ruta_archivo=item.ruta_archivo,
-            fecha_subida=item.fecha_subida.strftime("%Y-%m-%d %H:%M:%S") if item.fecha_subida else None,
-            ubicacion_id=item.ubicacion_id,
-            dispositivo_captura_id=item.dispositivo_captura_id,
-            clase_predicha=pred.clase_predicha if pred else None,
-            p_smog=float(pred.p_smog) if pred else None,
-        )
-
-    @router.delete("/imagenes/{imagen_id}")
-    async def eliminar_imagen(
-            imagen_id: int,
-            user: Usuario = Depends(require_roles(["Administrador del sistema"])),
-            db: Session = Depends(get_db),
-    ):
-        item = db.query(Imagen).filter(Imagen.id == imagen_id).first()
-        if not item:
-            raise HTTPException(status_code=404, detail="Imagen no encontrada")
-
-        pred = db.query(Prediccion).filter(Prediccion.imagen_id == item.id).first()
-        if pred:
-            db.delete(pred)
-        db.delete(item)
-        db.commit()
-        return {"ok": True, "message": "Imagen eliminada"}
+            pred = db.query(Prediccion).filter(Prediccion.imagen_id == item.id).first()
+            if pred:
+                db.delete(pred)
+            db.delete(item)
+            db.commit()
+            return {"ok": True, "message": "Imagen eliminada"}

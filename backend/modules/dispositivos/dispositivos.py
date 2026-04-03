@@ -10,10 +10,10 @@ from db import get_db, Usuario, DispositivoCaptura, HistorialDispositivo
 
 router = APIRouter()
 
-ADMIN = "Administrador del sistema"
-DEV = "Desarrollador"
-INV = "Investigador ambiental"
-OP = "Usuario operador"
+ADMIN = "Administrador"
+DEV = "Constructor del sistema"
+INV = "Usuario analista"
+OP = "Usuario final"
 
 
 class DispositivoItem(BaseModel):

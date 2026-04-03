@@ -96,7 +96,7 @@ def _parse_date(s: Optional[str]) -> Optional[date]:
 @router.get("/kpis", response_model=KPIsResponse)
 async def get_kpis(
         user: Usuario = Depends(
-            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
 ):
     """Totals and averages for KPI cards and gauge."""
@@ -140,7 +140,7 @@ async def get_kpis(
 @router.get("/clase-predicha", response_model=List[ClasePredichaItem])
 async def get_clase_predicha(
         user: Usuario = Depends(
-            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
 ):
     """Counts by predicted class (smog / sin_smog) for pie and bar charts."""
@@ -167,7 +167,7 @@ def _truncate_date(column, agrupar: str):
 @router.get("/tendencia-predicciones", response_model=List[TendenciaItem])
 async def get_tendencia_predicciones(
         user: Usuario = Depends(
-            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
     desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
     hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
@@ -206,7 +206,7 @@ async def get_tendencia_predicciones(
 @router.get("/tendencia-imagenes", response_model=List[TendenciaItem])
 async def get_tendencia_imagenes(
         user: Usuario = Depends(
-            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
     desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
     hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
@@ -241,7 +241,7 @@ BUCKETS = [(0.0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.01)]
 @router.get("/distribucion-confianza", response_model=List[HistogramBucket])
 async def get_distribucion_confianza(
         user: Usuario = Depends(
-            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
 ):
     """Confidence distribution buckets for histogram."""
@@ -263,7 +263,7 @@ async def get_distribucion_confianza(
 @router.get("/distribucion-p-smog", response_model=List[HistogramBucket])
 async def get_distribucion_p_smog(
         user: Usuario = Depends(
-            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
 ):
     """p_smog distribution buckets for histogram."""
@@ -285,7 +285,7 @@ async def get_distribucion_p_smog(
 @router.get("/por-ubicacion", response_model=List[PorUbicacionItem])
 async def get_por_ubicacion(
         user: Usuario = Depends(
-            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
 ):
     """Counts and % smog per location for bar chart and map."""
@@ -329,7 +329,7 @@ async def get_por_ubicacion(
 @router.get("/por-usuario", response_model=List[PorUsuarioItem])
 async def get_por_usuario(
         user: Usuario = Depends(
-            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
 ):
     """Image and prediction counts per user for bar chart."""
@@ -379,7 +379,7 @@ async def get_por_usuario(
 @router.get("/tabla-resumen", response_model=List[TablaResumenRow])
 async def get_tabla_resumen(
         user: Usuario = Depends(
-            require_roles(["Investigador ambiental", "Administrador del sistema", "Desarrollador"])),
+            require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
     desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
     hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
