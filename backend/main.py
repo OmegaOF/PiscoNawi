@@ -19,7 +19,7 @@ from modules.roles.roles import router as roles_router
 from modules.roles.roles import get_user_roles
 from modules.usuarios.usuarios import router as usuarios_router
 from modules.configuraciones.configuraciones import router as configuraciones_router
-
+from modules.reportes.reportes_generados import router as reportes_generados_router
 # Test database connection and create tables if needed
 try:
     with engine.connect() as conn:
@@ -58,7 +58,7 @@ app.include_router(dispositivos_router, prefix="/api/dispositivos", tags=["dispo
 app.include_router(roles_router, prefix="/api/roles", tags=["roles"])
 app.include_router(usuarios_router, prefix="/api/usuarios", tags=["usuarios"])
 app.include_router(configuraciones_router, prefix="/api/configuraciones", tags=["configuraciones"])
-
+app.include_router(reportes_generados_router, prefix="/api/reportes-generados", tags=["reportes-generados"])
 
 
 @app.post("/api/auth/login", response_model=Token)

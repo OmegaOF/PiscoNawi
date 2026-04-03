@@ -162,6 +162,45 @@ def _truncate_date(column, agrupar: str):
         return func.date_format(column, "%Y-%u")  # year + week (0-53)
     # default: dia
     return func.date(column)
+def fetch_tabla_resumen_data(
+    db: Session,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    agrupar: str = "dia",
+) -> List[TablaResumenRow]:
+    """Reusable query for summary table by period."""
+    col = _truncate_date(Prediccion.fecha_prediccion, agrupar)
+    q = (
+        db.query(
+            col.label("periodo"),
+            func.count(Prediccion.id).label("total"),
+            func.sum(case((Prediccion.clase_predicha == "smog", 1), else_=0)).label("smog"),
+            func.avg(Prediccion.confianza).label("confianza"),
+            func.avg(Prediccion.p_smog).label("p_smog"),
+        )
+        .group_by(col)
+        .order_by(col)
+    )
+    d = _parse_date(desde)
+    h = _parse_date(hasta)
+    if d is not None:
+        q = q.filter(Prediccion.fecha_prediccion >= datetime.combine(d, datetime.min.time()))
+    if h is not None:
+        q = q.filter(Prediccion.fecha_prediccion < datetime.combine(h + timedelta(days=1), datetime.min.time()))
+    rows = q.all()
+    return [
+        TablaResumenRow(
+            periodo=str(r.periodo),
+            total_predicciones=int(r.total or 0),
+            total_smog=int(r.smog or 0),
+            pct_smog=round(float(r.smog or 0) / float(r.total or 1) * 100.0, 2),
+            confianza_promedio=round(float(r.confianza or 0), 4),
+            p_smog_promedio=round(float(r.p_smog or 0), 4),
+        )
+        for r in rows
+    ]
+
+
 
 
 @router.get("/tendencia-predicciones", response_model=List[TendenciaItem])
@@ -300,6 +339,7 @@ async def get_por_ubicacion(
         .group_by(Imagen.ubicacion_id)
         .subquery()
     )
+
     rows = (
         db.query(
             Ubicacion.id,
@@ -311,10 +351,12 @@ async def get_por_ubicacion(
         .join(sub, Ubicacion.id == sub.c.ubicacion_id)
         .all()
     )
+
     return [
         PorUbicacionItem(
             ubicacion_id=r.id,
-            nombre=None,
+            # 🔥 CAMBIO CLAVE AQUÍ
+            nombre=f"U{r.id}",
             latitud=float(r.latitud),
             longitud=float(r.longitud),
             total=r.total,
@@ -386,33 +428,6 @@ async def get_tabla_resumen(
     agrupar: str = Query("dia", regex="^(dia|semana|mes)$"),
 ):
     """Summary table by period (total, smog, %, avg confidence, avg p_smog)."""
-    col = _truncate_date(Prediccion.fecha_prediccion, agrupar)
-    q = (
-        db.query(
-            col.label("periodo"),
-            func.count(Prediccion.id).label("total"),
-            func.sum(case((Prediccion.clase_predicha == "smog", 1), else_=0)).label("smog"),
-            func.avg(Prediccion.confianza).label("confianza"),
-            func.avg(Prediccion.p_smog).label("p_smog"),
-        )
-        .group_by(col)
-        .order_by(col)
-    )
-    d = _parse_date(desde)
-    h = _parse_date(hasta)
-    if d is not None:
-        q = q.filter(Prediccion.fecha_prediccion >= datetime.combine(d, datetime.min.time()))
-    if h is not None:
-        q = q.filter(Prediccion.fecha_prediccion < datetime.combine(h + timedelta(days=1), datetime.min.time()))
-    rows = q.all()
-    return [
-        TablaResumenRow(
-            periodo=str(r.periodo),
-            total_predicciones=int(r.total or 0),
-            total_smog=int(r.smog or 0),
-            pct_smog=round(float(r.smog or 0) / float(r.total or 1) * 100.0, 2),
-            confianza_promedio=round(float(r.confianza or 0), 4),
-            p_smog_promedio=round(float(r.p_smog or 0), 4),
-        )
-        for r in rows
-    ]
+
+
+    return fetch_tabla_resumen_data(db=db, desde=desde, hasta=hasta, agrupar=agrupar)
