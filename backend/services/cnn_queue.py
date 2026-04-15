@@ -296,12 +296,12 @@ def _run_post_processing_analysis(db: Session):
         # Commit all successful updates
         try:
             db.commit()
-            print(f"✅ Análisis adicional finalizado: {success_count} exitosos, {failed_count} fallidos")
+            print(f"✅ Análisis adicional finalizado: {success_count} exitosos,  fallidos")
         except Exception as e:
             db.rollback()
-            print(f"❌ Error guardando cambios del análisis adicional: {str(e)}")
+            print(f" guardando cambios del análisis : ")
 
     except Exception as e:
-        print(f"❌ Error general en análisis adicional: {str(e)}")
+        print(f"análisis :")
         if db:
             db.rollback()
