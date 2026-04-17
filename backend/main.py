@@ -87,3 +87,7 @@ async def get_current_user_info(current_user=Depends(get_current_user), db: Sess
 @app.get("/")
 async def root():
     return {"message": "PISCONAWI IA API"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
