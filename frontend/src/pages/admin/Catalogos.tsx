@@ -18,6 +18,9 @@ const Catalogos: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Ciudad | null>(null);
   const [form, setForm] = useState({ nombre: '', provincia_id: '', latitud: '', longitud: '' });
+  const [paisForm, setPaisForm] = useState({ nombre: '', codigo_iso: '' });
+  const [provinciaForm, setProvinciaForm] = useState({ nombre: '', pais_id: '' });
+
 
   useEffect(() => {
     api.get<Pais[]>('/catalogos/paises').then((r) => setPaises(r.data)).catch(() => setError('No se pudo cargar países'));
@@ -57,6 +60,38 @@ const Catalogos: React.FC = () => {
       setError(e?.response?.data?.detail || 'No se pudo guardar ciudad');
     }
   };
+  const submitPais = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/catalogos/paises', {
+        nombre: paisForm.nombre,
+        codigo_iso: paisForm.codigo_iso || null,
+      });
+      const r = await api.get<Pais[]>('/catalogos/paises');
+      setPaises(r.data);
+      setPaisForm({ nombre: '', codigo_iso: '' });
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'No se pudo crear país');
+    }
+  };
+
+  const submitProvincia = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/catalogos/provincias', {
+        nombre: provinciaForm.nombre,
+        pais_id: Number(provinciaForm.pais_id),
+      });
+      if (paisId) {
+        const r = await api.get<Provincia[]>('/catalogos/provincias', { params: { pais_id: paisId } });
+        setProvincias(r.data);
+      }
+      setProvinciaForm({ nombre: '', pais_id: paisId ? String(paisId) : '' });
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'No se pudo crear provincia');
+    }
+  };
+
 
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -65,7 +100,12 @@ const Catalogos: React.FC = () => {
         {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded">{error}</div>}
 
         <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6 grid md:grid-cols-2 gap-3">
-          <select className="border rounded px-3 py-2" value={paisId} onChange={(e) => { setPaisId(Number(e.target.value) || ''); setProvinciaId(''); }}>
+          <select className="border rounded px-3 py-2" value={paisId} onChange={(e) => {
+            const selectedPaisId = Number(e.target.value) || '';
+            setPaisId(selectedPaisId);
+            setProvinciaId('');
+            setProvinciaForm((prev) => ({ ...prev, pais_id: selectedPaisId ? String(selectedPaisId) : '' }));
+          }}>
             <option value="">Seleccione país</option>
             {paises.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
           </select>
@@ -74,15 +114,54 @@ const Catalogos: React.FC = () => {
             {provincias.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
           </select>
         </div>
+      {canEdit && (
+          <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <form onSubmit={submitPais} className="bg-white border border-gray-200 rounded-lg p-4 grid grid-cols-3 gap-3">
+              <h3 className="col-span-3 text-sm font-semibold text-vino">Paso 1: Crear país</h3>
+              <input
+                className="border rounded px-3 py-2 col-span-2"
+                placeholder="Nuevo país"
+                value={paisForm.nombre}
+                onChange={(e) => setPaisForm({ ...paisForm, nombre: e.target.value })}
+                required
+              />
+              <input
+                className="border rounded px-3 py-2"
+                placeholder="ISO"
+                value={paisForm.codigo_iso}
+                onChange={(e) => setPaisForm({ ...paisForm, codigo_iso: e.target.value })}
+              />
+              <button className="bg-vino text-white rounded px-4 py-2 col-span-3">Guardar país</button>
+            </form>
+
+            <form onSubmit={submitProvincia} className="bg-white border border-gray-200 rounded-lg p-4 grid grid-cols-3 gap-3">
+              <h3 className="col-span-3 text-sm font-semibold text-vino">Paso 2: Crear provincia (dentro de país)</h3>
+              <input
+                className="border rounded px-3 py-2 col-span-2"
+                placeholder="Nueva provincia"
+                value={provinciaForm.nombre}
+                onChange={(e) => setProvinciaForm({ ...provinciaForm, nombre: e.target.value })}
+                required
+              />
+              <input
+                className="border rounded px-3 py-2"
+                placeholder="Pais ID (ej: 1)"
+                value={provinciaForm.pais_id}
+                onChange={(e) => setProvinciaForm({ ...provinciaForm, pais_id: e.target.value })}
+                required
+              />
+              <button className="bg-vino text-white rounded px-4 py-2 col-span-3">Guardar provincia</button>
+            </form>
+          </div>
+        )}
 
         {canEdit && (
           <form onSubmit={submitCiudad} className="bg-white border border-gray-200 rounded-lg p-4 mb-6 grid md:grid-cols-5 gap-3">
+            <h3 className="md:col-span-5 text-sm font-semibold text-vino">Paso 3: Crear ciudad (dentro de provincia)</h3>
             <input className="border rounded px-3 py-2" placeholder="Nombre ciudad" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required />
-            <input className="border rounded px-3 py-2" placeholder="Provincia ID" value={form.provincia_id} onChange={(e) => setForm({ ...form, provincia_id: e.target.value })} required />
-            <input className="border rounded px-3 py-2" placeholder="Latitud" value={form.latitud} onChange={(e) => setForm({ ...form, latitud: e.target.value })} />
+            <input className="border rounded px-3 py-2" placeholder="Provincia ID (ej: 10)" value={form.provincia_id} onChange={(e) => setForm({ ...form, provincia_id: e.target.value })} required />            <input className="border rounded px-3 py-2" placeholder="Latitud" value={form.latitud} onChange={(e) => setForm({ ...form, latitud: e.target.value })} />
             <input className="border rounded px-3 py-2" placeholder="Longitud" value={form.longitud} onChange={(e) => setForm({ ...form, longitud: e.target.value })} />
-            <button className="bg-vino text-white rounded px-4 py-2">{editing ? 'Actualizar ciudad' : 'Crear ciudad'}</button>
-          </form>
+            <button className="bg-vino text-white rounded px-4 py-2">{editing ? 'Actualizar ciudad' : 'Guardar ciudad'}</button>          </form>
         )}
 
         <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">

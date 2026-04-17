@@ -42,7 +42,24 @@ class CiudadUpdate(BaseModel):
     latitud: Optional[float] = None
     longitud: Optional[float] = None
 
+class PaisCreate(BaseModel):
+    nombre: str
+    codigo_iso: Optional[str] = None
 
+
+class PaisUpdate(BaseModel):
+    nombre: Optional[str] = None
+    codigo_iso: Optional[str] = None
+
+
+class ProvinciaCreate(BaseModel):
+    nombre: str
+    pais_id: int
+
+
+class ProvinciaUpdate(BaseModel):
+    nombre: Optional[str] = None
+    pais_id: Optional[int] = None
 @router.get("/paises", response_model=List[PaisItem])
 async def get_paises(
         current_user: Usuario = Depends(require_roles(
@@ -58,6 +75,51 @@ async def get_paises(
         )
         for r in rows
     ]
+
+
+@router.post("/paises", response_model=PaisItem)
+async def crear_pais(
+    payload: PaisCreate,
+    user: Usuario = Depends(require_roles(["Administrador"])),
+    db: Session = Depends(get_db),
+):
+    item = Pais(
+        nombre=payload.nombre,
+        codigo_iso=payload.codigo_iso,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return PaisItem(
+        id=item.id,
+        nombre=item.nombre,
+        codigo_iso=item.codigo_iso,
+    )
+
+
+@router.put("/paises/{pais_id}", response_model=PaisItem)
+async def actualizar_pais(
+    pais_id: int,
+    payload: PaisUpdate,
+    user: Usuario = Depends(require_roles(["Administrador"])),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Pais).filter(Pais.id == pais_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="País no encontrado")
+
+    if payload.nombre is not None:
+        item.nombre = payload.nombre
+    if payload.codigo_iso is not None:
+        item.codigo_iso = payload.codigo_iso
+
+    db.commit()
+    db.refresh(item)
+    return PaisItem(
+        id=item.id,
+        nombre=item.nombre,
+        codigo_iso=item.codigo_iso,
+    )
 
 
 @router.get("/provincias", response_model=List[ProvinciaItem])
@@ -80,6 +142,56 @@ async def get_provincias(
         for r in rows
     ]
 
+@router.post("/provincias", response_model=ProvinciaItem)
+async def crear_provincia(
+    payload: ProvinciaCreate,
+    user: Usuario = Depends(require_roles(["Administrador"])),
+    db: Session = Depends(get_db),
+):
+    pais = db.query(Pais).filter(Pais.id == payload.pais_id).first()
+    if not pais:
+        raise HTTPException(status_code=404, detail="País no encontrado")
+
+    item = Provincia(
+        nombre=payload.nombre,
+        pais_id=payload.pais_id,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return ProvinciaItem(
+        id=item.id,
+        nombre=item.nombre,
+        pais_id=item.pais_id,
+    )
+
+
+@router.put("/provincias/{provincia_id}", response_model=ProvinciaItem)
+async def actualizar_provincia(
+    provincia_id: int,
+    payload: ProvinciaUpdate,
+    user: Usuario = Depends(require_roles(["Administrador"])),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Provincia).filter(Provincia.id == provincia_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Provincia no encontrada")
+
+    if payload.nombre is not None:
+        item.nombre = payload.nombre
+    if payload.pais_id is not None:
+        pais = db.query(Pais).filter(Pais.id == payload.pais_id).first()
+        if not pais:
+            raise HTTPException(status_code=404, detail="País no encontrado")
+        item.pais_id = payload.pais_id
+
+    db.commit()
+    db.refresh(item)
+    return ProvinciaItem(
+        id=item.id,
+        nombre=item.nombre,
+        pais_id=item.pais_id,
+    )
 
 @router.get("/ciudades", response_model=List[CiudadItem])
 async def get_ciudades(
