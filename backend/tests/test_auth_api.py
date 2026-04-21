@@ -9,7 +9,7 @@ def test_login_success(client, admin_user):
     assert body["token_type"] == "bearer"
 
 
-def test_login_wrong_password(client, admin_user):
+def test_login_usuario_exitoso(client, admin_user):
     response = client.post(
         "/api/auth/login",
         json={"username": "admin_test", "password": "incorrecta"},
@@ -17,7 +17,7 @@ def test_login_wrong_password(client, admin_user):
     assert response.status_code == 401
 
 
-def test_login_unknown_user(client):
+def test_login_usuario_desconocido(client):
     response = client.post(
         "/api/auth/login",
         json={"username": "no_existe", "password": "x"},
@@ -25,7 +25,7 @@ def test_login_unknown_user(client):
     assert response.status_code == 401
 
 
-def test_me_with_valid_token(client, admin_user, admin_token, auth_headers):
+def test_me_usuario_con_token_valido(client, admin_user, admin_token, auth_headers):
     response = client.get("/api/auth/me", headers=auth_headers(admin_token))
     assert response.status_code == 200
 
@@ -34,6 +34,6 @@ def test_me_with_valid_token(client, admin_user, admin_token, auth_headers):
     assert "Administrador" in body["roles"]
 
 
-def test_me_without_token(client):
+def test_me_usuario_sin_token(client):
     response = client.get("/api/auth/me")
     assert response.status_code in (401, 403)

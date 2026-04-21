@@ -13,7 +13,7 @@ class _StubModel:
         return np.array([[self._value]])
 
 
-def test_preprocess_image_shape_and_dtype(tmp_path):
+def test_preprocesar_imagen_forma_y_tipo_dato(tmp_path):
     img_path = tmp_path / "tiny.png"
     Image.new("RGB", (10, 10), color=(128, 128, 128)).save(img_path)
 
@@ -25,7 +25,7 @@ def test_preprocess_image_shape_and_dtype(tmp_path):
     assert arr.max() <= 1.0
 
 
-def test_predict_smog_classifies_as_smog(monkeypatch):
+def test_prediccion_smog_clasifica_como_smog(monkeypatch):
     monkeypatch.setattr(smog_model, "load_model_once", lambda: _StubModel(0.85))
     monkeypatch.setattr(
         smog_model,
@@ -40,7 +40,7 @@ def test_predict_smog_classifies_as_smog(monkeypatch):
     assert abs(result["confianza"] - 0.85) < 1e-6
 
 
-def test_predict_smog_classifies_as_no_smog(monkeypatch):
+def test_prediccion_smog_clasifica_como_no_smog(monkeypatch):
     monkeypatch.setattr(smog_model, "load_model_once", lambda: _StubModel(0.10))
     monkeypatch.setattr(
         smog_model,
@@ -55,7 +55,7 @@ def test_predict_smog_classifies_as_no_smog(monkeypatch):
     assert abs(result["confianza"] - 0.90) < 1e-6
 
 
-def test_predict_smog_clamps_out_of_range(monkeypatch):
+def test_prediccion_smog_limita_valores_fuera_de_rango(monkeypatch):
     monkeypatch.setattr(smog_model, "load_model_once", lambda: _StubModel(1.7))
     monkeypatch.setattr(
         smog_model,
@@ -69,7 +69,7 @@ def test_predict_smog_clamps_out_of_range(monkeypatch):
     assert result["clase_predicha"] == "smog"
 
 
-def test_cnn_queue_get_status_shape():
+def test_estado_cnn_queue_devuelve_forma_correcta():
     status = get_status()
 
     assert set(status.keys()) == {"running", "current_file", "processed", "pending"}

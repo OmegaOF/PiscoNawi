@@ -179,7 +179,7 @@ def _worker(
                 confianza=float(result["confianza"]),
                 p_smog=float(result["p_smog"]),
                 fecha_prediccion=datetime.utcnow(),
-                observacion="CNN last_model.keras (FIFO)"
+                observacion=""
             )
             db.add(pred)
             db.commit()
@@ -236,8 +236,7 @@ def _run_post_processing_analysis(db: Session):
     This automatically enhances predictions for today's images.
     """
     try:
-        from openai_service import analizar_imagen_openai
-        
+        from modelo_service import analizar_imagen_modelo
         # Get today's date (start of day)
         today = date.today()
         start_of_day = datetime.combine(today, datetime.min.time())
@@ -269,7 +268,7 @@ def _run_post_processing_analysis(db: Session):
                 # We need to run async function in sync context
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                resultado = loop.run_until_complete(analizar_imagen_openai(imagen.ruta_archivo))
+                resultado = loop.run_until_complete(analizar_imagen_modelo(imagen.ruta_archivo))
                 loop.close()
 
                 # Update the prediction

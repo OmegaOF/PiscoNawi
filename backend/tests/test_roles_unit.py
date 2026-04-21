@@ -1,14 +1,14 @@
 from modules.roles.roles import get_user_roles
 
 
-def test_get_user_roles_returns_assigned_roles(db, admin_user):
+def test_obtener_roles_usuario_devuelve_roles_asignados(db, admin_user):
     roles = get_user_roles(db, admin_user.id)
 
     assert isinstance(roles, list)
     assert "Administrador" in roles
 
 
-def test_get_user_roles_empty_for_user_without_roles(db):
+def test_obtener_roles_usuario_vacio_para_usuario_sin_roles(db):
     from db import Usuario
     from modules.auth.auth import get_password_hash
 

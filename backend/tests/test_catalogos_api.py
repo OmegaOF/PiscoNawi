@@ -1,7 +1,7 @@
 from db import Pais
 
 
-def test_list_paises_authenticated(client, db, operator_user, operator_token, auth_headers):
+def test_listar_paises_autenticado(client, db, operator_user, operator_token, auth_headers):
     db.add(Pais(nombre="Perú", codigo_iso="PE"))
     db.commit()
 

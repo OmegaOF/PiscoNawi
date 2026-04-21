@@ -19,8 +19,7 @@ from sqlalchemy import func
 - **Purpose**: Automatically runs additional analysis after CNN processing completes
 - **Key Features**:
   - Processes all images uploaded today that have CNN predictions
-  - Uses the existing `analizar_imagen_openai()` function from `openai_service.py`
-  - Runs async code in a synchronous context using `asyncio.new_event_loop()`
+  - Uses the existing `analizar_imagen_modelo()` function from `modelo_service.py`  - Runs async code in a synchronous context using `asyncio.new_event_loop()`
   - Updates predictions with enhanced analysis results
   - Handles license plate detection and updates
   - Commits all changes at once for efficiency
@@ -119,8 +118,7 @@ Process completes, state resets
 ✅ **Backend chaining**: Additional analysis runs internally, not via separate API call
 ✅ **Single frontend action**: User only clicks one button
 ✅ **Unified process**: Appears as one continuous operation
-✅ **No UI mentions**: No reference to "analizar-todas-hoy" or OpenAI in UI
-✅ **Progress indicator**: Visual progress bar with smooth updates
+✅ **No UI mentions**: No reference to "analizar-todas-hoy" or external providers in UI✅ **Progress indicator**: Visual progress bar with smooth updates
 ✅ **Loading state**: Button disabled and shows processing status
 ✅ **Success feedback**: Green message on completion
 ✅ **Minimal refactoring**: Changes focused on specific integration points

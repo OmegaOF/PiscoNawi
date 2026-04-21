@@ -1,4 +1,4 @@
-def test_list_usuarios_as_admin(client, admin_user, admin_token, auth_headers):
+def test_admin_puede_listar_usuarios(client, admin_user, admin_token, auth_headers):
     response = client.get("/api/usuarios", headers=auth_headers(admin_token))
     assert response.status_code == 200
 
@@ -8,12 +8,12 @@ def test_list_usuarios_as_admin(client, admin_user, admin_token, auth_headers):
     assert "admin_test" in usernames
 
 
-def test_list_usuarios_forbidden_for_operator(client, operator_user, operator_token, auth_headers):
+def test_listar_usuarios_restringido_para_operador(client, operator_user, operator_token, auth_headers):
     response = client.get("/api/usuarios", headers=auth_headers(operator_token))
     assert response.status_code == 403
 
 
-def test_create_usuario_as_admin_then_login(client, admin_user, admin_token, auth_headers):
+def test_admin_crea_usuario_y_luego_inicia_sesion(client, admin_user, admin_token, auth_headers):
     create_response = client.post(
         "/api/usuarios",
         headers=auth_headers(admin_token),
@@ -34,7 +34,7 @@ def test_create_usuario_as_admin_then_login(client, admin_user, admin_token, aut
     assert "access_token" in login_response.json()
 
 
-def test_create_usuario_duplicate_username(client, admin_user, admin_token, auth_headers):
+def test_crear_usuario_nombre_duplicado(client, admin_user, admin_token, auth_headers):
     payload = {"nombre": "Dup", "username": "dup_user", "password": "xyz"}
 
     first = client.post("/api/usuarios", headers=auth_headers(admin_token), json=payload)

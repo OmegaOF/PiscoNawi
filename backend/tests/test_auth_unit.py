@@ -9,25 +9,25 @@ from modules.auth.auth import (
 )
 
 
-def test_password_hash_roundtrip():
+def test_hash_contrasena_ida_y_vuelta():
     password = "unaClaveSecreta123"
     hashed = get_password_hash(password)
     assert hashed != password
     assert verify_password(password, hashed) is True
 
 
-def test_password_hash_rejects_wrong():
+def test_hash_contrasena_rechaza_contrasena_incorrecta():
     hashed = get_password_hash("correcta")
     assert verify_password("incorrecta", hashed) is False
 
 
-def test_jwt_encode_decode_sub():
+def test_jwt_codifica_y_decodifica_sub_correctamente():
     token = create_access_token({"sub": "fernando"})
     decoded = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     assert decoded["sub"] == "fernando"
 
 
-def test_jwt_contains_expiration():
+def test_jwt_incluye_expiracion():
     token = create_access_token({"sub": "usuario_prueba"})
     decoded = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     assert "exp" in decoded

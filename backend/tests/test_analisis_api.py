@@ -3,7 +3,7 @@ from datetime import datetime
 from db import Imagen, Prediccion
 
 
-def test_estado_cnn_returns_status_keys(client, operator_user, operator_token, auth_headers):
+def test_estado_cnn_contiene_claves_esperadas(client, operator_user, operator_token, auth_headers):
     response = client.get("/api/analisis/estado-cnn", headers=auth_headers(operator_token))
     assert response.status_code == 200
 
@@ -12,7 +12,7 @@ def test_estado_cnn_returns_status_keys(client, operator_user, operator_token, a
     assert body["running"] is False
 
 
-def test_emisiones_returns_seeded_prediction(client, db, operator_user, operator_token, auth_headers):
+def test_emisiones_retorna_prediccion_inicial(client, db, operator_user, operator_token, auth_headers):
     imagen = Imagen(
         filename_original="test.jpg",
         ruta_archivo="http://localhost:8000/capturas/test.jpg",

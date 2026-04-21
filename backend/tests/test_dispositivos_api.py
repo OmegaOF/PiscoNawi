@@ -1,7 +1,7 @@
 from db import DispositivoCaptura
 
 
-def test_list_dispositivos_authenticated(client, db, operator_user, operator_token, auth_headers):
+def test_listar_dispositivos_autenticado(client, db, operator_user, operator_token, auth_headers):
     db.add(
         DispositivoCaptura(
             nombre_dispositivo="Cámara 1",
