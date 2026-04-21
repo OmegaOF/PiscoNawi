@@ -91,10 +91,7 @@ async def analizar_con_ia(
         prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
         prediccion.confianza = resultado["nivel_confianza"] / 100.0
         prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
-        prediccion.observacion = resultado["descripcion_corta"]
-
-        if resultado.get("placa") and resultado["placa"] != "undefined":
-            imagen.placa_manual = resultado["placa"]
+        prediccion.observacion = '-'
 
         db.commit()
         return {"message": "Análisis completado y actualizado", "resultado": resultado}
@@ -287,11 +284,8 @@ async def analizar_todas_imagenes_hoy(
             prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
             prediccion.confianza = resultado["nivel_confianza"] / 100.0
             prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
-            prediccion.observacion = resultado["descripcion_corta"]
+            prediccion.observacion = "-"
             prediccion.fecha_prediccion = func.now()
-
-            if resultado.get("placa") and resultado["placa"] != "undefined":
-                imagen.placa_manual = resultado["placa"]
 
             success_count += 1
 
