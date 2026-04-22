@@ -12,7 +12,7 @@ from PIL import Image
 _model: tf.keras.Model | None = None
 
 MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "last_model.keras"
-TARGET_SIZE = (224, 224)  # ajusta si tu modelo usa otro tamaño
+TARGET_SIZE = (224, 224)
 
 def load_model_once() -> tf.keras.Model:
     global _model
@@ -22,28 +22,27 @@ def load_model_once() -> tf.keras.Model:
 
 def preprocess_image(image_path: str) -> np.ndarray:
     """
-    Devuelve batch (1, H, W, 3) normalizado [0,1] en RGB.
+    preprocesamiento
     """
     img = Image.open(image_path).convert("RGB")
     img = img.resize(TARGET_SIZE)
     arr = np.array(img, dtype=np.float32) / 255.0
     return np.expand_dims(arr, axis=0)
-
+    """
+    resultado 
+    (1, 224, 224, 3)
+    """
 def predict_smog(image_path: str) -> dict:
-    """
-    Retorna:
-      - clase_predicha: 'smog' o 'sin_smog'
-      - p_smog: float 0..1
-      - confianza: float 0..1 (por ahora igual a p_smog o 1-p_smog según clase)
-    """
+
     model = load_model_once()
     x = preprocess_image(image_path)
     y = model.predict(x, verbose=0)
+    # [[0.23]] o [[0.82]]
 
-    # Caso típico binario: salida (1,1) o (1,) con probabilidad de "smog"
     p = float(np.squeeze(y))
+    # 0.23 (23%) o 0.82 (82%)
 
-    # Por seguridad: clamp
+    # Por seguridad: para no pasarse del 100
     p = max(0.0, min(1.0, p))
 
     clase = "smog" if p >= 0.5 else "sin_smog"

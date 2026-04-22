@@ -54,7 +54,7 @@ def camera_capture_loop():
 
     print("✅ Camera opened successfully!")
     last_capture = 0
-    COOLDOWN = 5  # seconds between captures
+    COOLDOWN = 5  # tiempo de espera netre captura
 
     while camera_active:
         ret, frame = cap.read()
@@ -74,7 +74,7 @@ def camera_capture_loop():
                 label = model.names[cls]
 
                 # Check if detected object is a vehicle
-                if label in ["car", "bus", "truck", "motorbike"]:
+                if label in ["car"]:
                     detected = True
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
 

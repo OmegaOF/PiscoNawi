@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from db import SessionLocal, Imagen, Prediccion, DispositivoCaptura
-from services.smog_model import predict_smog  # <- usa tu CNN ya existente
+from services.smog_model import predict_smog
 
 # ======================
 # ESTADO GLOBAL
