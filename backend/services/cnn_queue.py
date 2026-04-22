@@ -64,14 +64,12 @@ def _ensure_image_row(
     # Si ya existe por URL pública
     img = db.query(Imagen).filter(Imagen.ruta_archivo == public_url).first()
     if img:
-        print(f"🧾 _ensure_image_row user_id recibido: {user_id}")
         if ubicacion_id is not None:
             img.ubicacion_id = ubicacion_id
         if user_id is not None and img.usuario_id is None:
             img.usuario_id = user_id
         if dispositivo_id is not None and img.dispositivo_captura_id is None:
             img.dispositivo_captura_id = dispositivo_id
-        print(f"🧾 _ensure_image_row usuario_id final antes de commit: {img.usuario_id}")
         if (
                 ubicacion_id is not None
                 or (user_id is not None and img.usuario_id is not None)
@@ -84,7 +82,6 @@ def _ensure_image_row(
     # Si ya existe por filename_original (por si antes se guardó diferente)
     img = db.query(Imagen).filter(Imagen.filename_original == filename).first()
     if img:
-        print(f"🧾 _ensure_image_row user_id recibido: {user_id}")
         img.ruta_archivo = public_url
         if ubicacion_id is not None:
             img.ubicacion_id = ubicacion_id
@@ -92,7 +89,6 @@ def _ensure_image_row(
             img.usuario_id = user_id
         if dispositivo_id is not None and img.dispositivo_captura_id is None:
             img.dispositivo_captura_id = dispositivo_id
-        print(f"🧾 _ensure_image_row usuario_id final antes de commit: {img.usuario_id}")
         db.commit()
         db.refresh(img)
         return img
@@ -105,8 +101,6 @@ def _ensure_image_row(
         usuario_id=user_id,
         ubicacion_id=ubicacion_id,
     )
-    print(f"🧾 _ensure_image_row user_id recibido: {user_id}")
-    print(f"🧾 _ensure_image_row usuario_id final antes de commit: {img.usuario_id}")
     db.add(img)
     db.commit()
     db.refresh(img)
@@ -159,8 +153,7 @@ def _worker(
                 current_file = filename
 
             # 1) asegurar fila en imagenes (guardando URL pública y opcional ubicación)
-            print(f"👷 _worker user_id recibido: {user_id}")
-            print(f"👷 _worker user_id recibido: {user_id}")
+            print("cnn procesando")
             img_row = _ensure_image_row(
                 db,
                 image_path,
@@ -196,8 +189,7 @@ def _worker(
     except Exception as e:
         if db:
             db.rollback()
-        print("❌ Error en worker CNN:", str(e))
-
+        print("modelo no encontrado")
     finally:
         if db:
             db.close()
@@ -214,7 +206,7 @@ def start_queue(
     dispositivo_id: Optional[int] = None,
 ):
     """Inicia la cola FIFO si no está corriendo. Opcionalmente asocia las imágenes a ubicacion_id."""
-    print(f"🚀 start_queue user_id recibido: {user_id}")
+    print("cnn procesando")
     t = threading.Thread(target=_worker, args=(ubicacion_id, user_id, dispositivo_id), daemon=True)
     t.start()
 
@@ -236,7 +228,7 @@ def _run_post_processing_analysis(db: Session):
     This automatically enhances predictions for today's images.
     """
     try:
-        from modelo_service import analizar_imagen_modelo
+        from services.modelo_service import analizar_imagen_modelo
         # Get today's date (start of day)
         today = date.today()
         start_of_day = datetime.combine(today, datetime.min.time())
@@ -247,21 +239,17 @@ def _run_post_processing_analysis(db: Session):
         ).all()
 
         if not images_with_predictions:
-            print("ℹ️ No hay imágenes para análisis adicional")
             return
 
-        print(f"🔄 Iniciando análisis adicional de {len(images_with_predictions)} imágenes...")
-        
-        success_count = 0
-        failed_count = 0
+        print("cnn procesando")
+
 
         for imagen in images_with_predictions:
             try:
                 # Get the prediction for this image
                 prediccion = db.query(Prediccion).filter(Prediccion.imagen_id == imagen.id).first()
                 if not prediccion:
-                    failed_count += 1
-                    print(f"⚠️ Predicción no encontrada para imagen {imagen.id}")
+                    print("modelo no encontrado")
                     continue
 
                 # Analyze with additional service
@@ -275,32 +263,25 @@ def _run_post_processing_analysis(db: Session):
                 prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
                 prediccion.confianza = resultado["nivel_confianza"] / 100.0
                 prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
-                prediccion.observacion = resultado["descripcion_corta"]
+                prediccion.observacion = ""
                 prediccion.fecha_prediccion = func.now()
 
-                # Update license plate if detected
-                if resultado.get("placa") and resultado["placa"] != "undefined":
-                    imagen.placa_manual = resultado["placa"]
 
-                success_count += 1
-                print(f"✅ Análisis adicional completado para imagen {imagen.id}")
 
             except Exception as e:
-                failed_count += 1
-                error_msg = str(e) if str(e) else f"Error desconocido (tipo: {type(e).__name__})"
-                print(f"❌ Error en análisis adicional de imagen {imagen.id}: {error_msg}")
+                print("modelo no encontrado")
                 db.rollback()
                 continue
 
         # Commit all successful updates
         try:
             db.commit()
-            print(f"✅ Análisis adicional finalizado: {success_count} exitosos,  fallidos")
+            print("cnn procesando")
         except Exception as e:
             db.rollback()
-            print(f" guardando cambios del análisis : ")
+            print("modelo no encontrado")
 
     except Exception as e:
-        print(f"análisis :")
+        print("modelo no encontrado")
         if db:
             db.rollback()

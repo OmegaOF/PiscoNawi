@@ -18,8 +18,7 @@ Sistema completo para la detección y análisis de emisiones de vehículos utili
 - `auth.py`: Sistema de autenticación JWT
 - `captura.py`: Control de procesos YOLO
 - `analisis.py`: Consultas de análisis de emisiones
-- `openai_service.py`: Integración con CNN
-
+- `modelo_service.py`: Integración con CNN
 ### Frontend (React + Tailwind CSS)
 - Páginas: Login, Dashboard, Captura, Análisis
 - Tema: Beige (#F5F0E6) y Vino (#6B1F2B)
