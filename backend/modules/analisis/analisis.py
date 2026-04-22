@@ -83,15 +83,9 @@ async def analizar_con_ia(
     if not prediccion:
         raise HTTPException(status_code=404, detail="Predicción no encontrada para esta imagen")
 
-    from services.modelo_service import analizar_imagen_modelo
+    from backend.services.modelo_service import analizar_imagen_modelo
     try:
         resultado = await analizar_imagen_modelo(imagen.ruta_archivo)
-        if resultado.get("es_fallback"):
-            return {
-                "message": "Análisis no actualizado: el modelo externo no devolvió respuesta válida",
-                "resultado": resultado,
-            }
-
         prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
         prediccion.confianza = resultado["nivel_confianza"] / 100.0
         prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
@@ -283,13 +277,6 @@ async def analizar_todas_imagenes_hoy(
                 continue
 
             resultado = await analizar_imagen_modelo(imagen.ruta_archivo)
-
-            if resultado.get("es_fallback"):
-                failed_count += 1
-                errors.append(f"Modelo externo sin respuesta válida para imagen {imagen.id}")
-                continue
-
-
             prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
             prediccion.confianza = resultado["nivel_confianza"] / 100.0
             prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
