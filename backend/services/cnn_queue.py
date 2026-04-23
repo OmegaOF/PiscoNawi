@@ -97,7 +97,7 @@ def _ensure_image_row(
     img = Imagen(
         filename_original=filename,
         ruta_archivo=public_url,
-        fecha_subida=datetime.fromtimestamp(os.path.getmtime(image_path)),
+        fecha_subida=datetime.now(),
         usuario_id=user_id,
         ubicacion_id=ubicacion_id,
     )
