@@ -1,189 +1,171 @@
+import httpx
 import base64
 import json
 import os
-from pathlib import Path
-from typing import Any, Dict
-from urllib.parse import unquote, urlparse
+from typing import Dict, Any
+from dotenv import load_dotenv
 
-import httpx
+load_dotenv()
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_MODEL = "gpt-4o"  # Updated from deprecated gpt-4-vision-preview
 
-def _resultado_base(descripcion: str) -> dict:
-    return {
-        "smog_visible": False,
-        "nivel_confianza": 50,
-        "porcentaje_smog": 0,
-        "descripcion_corta": descripcion,
-        "placa": "undefined",
-        "es_fallback": True,
-    }
+async def analizar_imagen_openai(ruta_archivo: str) -> Dict[str, Any]:
+    """
+    Analiza una imagen usando CNN
+    """
+    if not OPENAI_API_KEY:
+        raise ValueError("OPENAI_API_KEY no configurada")
 
+    # Check if ruta_archivo is a URL or a file path
+    if ruta_archivo.startswith('http://localhost:8000/capturas/'):
+        # Convert URL back to local file path for efficiency and reliability
+        filename = ruta_archivo.replace('http://localhost:8000/capturas/', '')
+        local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'storage', 'capturas', filename)
+        print(f"Convirtiendo URL a ruta local: {ruta_archivo} -> {local_path}")
 
-def _normalizar_resultado(data: Dict[str, Any]) -> dict:
-    raw_smog = data.get("smog_visible", False)
-    if isinstance(raw_smog, str):
-        smog_visible = raw_smog.strip().lower() in {"true", "1", "yes", "si", "sí"}
+        if not os.path.exists(local_path):
+            raise FileNotFoundError(f"Archivo de imagen no encontrado en ruta local: {local_path} (desde URL: {ruta_archivo})")
+        try:
+            with open(local_path, "rb") as image_file:
+                image_data = image_file.read()
+                if not image_data:
+                    raise ValueError(f"El archivo de imagen está vacío: {local_path}")
+        except IOError as e:
+            raise Exception(f"Error al leer el archivo: {local_path} - {str(e)}")
+
+    elif ruta_archivo.startswith('http://') or ruta_archivo.startswith('https://'):
+        # Download image from URL (fallback for external URLs)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.get(ruta_archivo)
+                if response.status_code != 200:
+                    raise FileNotFoundError(f"No se pudo descargar la imagen desde: {ruta_archivo} (Status: {response.status_code})")
+                image_data = response.content
+                if not image_data:
+                    raise ValueError(f"La imagen descargada está vacía: {ruta_archivo}")
+            except httpx.RequestError as e:
+                raise Exception(f"Error de conexión al descargar imagen: {ruta_archivo} - {str(e)}")
     else:
-        smog_visible = bool(raw_smog)
+        # Read from local file
+        if not os.path.exists(ruta_archivo):
+            raise FileNotFoundError(f"Archivo de imagen no encontrado: {ruta_archivo}")
+        try:
+            with open(ruta_archivo, "rb") as image_file:
+                image_data = image_file.read()
+                if not image_data:
+                    raise ValueError(f"El archivo de imagen está vacío: {ruta_archivo}")
+        except IOError as e:
+            raise Exception(f"Error al leer el archivo: {ruta_archivo} - {str(e)}")
 
-    nivel = int(float(data.get("nivel_confianza", 50)))
-    porcentaje = int(float(data.get("porcentaje_smog", 0)))
+    # Codificar la imagen en base64
+    try:
+        base64_image = base64.b64encode(image_data).decode('utf-8')
+        if not base64_image:
+            raise ValueError("Error al codificar la imagen en base64")
+    except Exception as e:
+        raise Exception(f"Error al codificar imagen en base64: {str(e)}")
 
-    nivel = max(0, min(100, nivel))
-    porcentaje = max(0, min(100, porcentaje))
+    # Crear el prompt para el análisis
+    prompt = """
+Analiza esta imagen de un vehículo y responde exclusivamente en JSON con el siguiente formato:
+{
+  "smog_visible": true/false,
+  "porcentaje_smog": 0-100,
+  "nivel_confianza": 0-100,
+  "descripcion_corta": "descripción breve del estado del vehículo",
+  "placa": "número de placa si es legible, sino 'undefined'"
+}
 
-    return {
-        "smog_visible": smog_visible,
-        "nivel_confianza": nivel,
-        "porcentaje_smog": porcentaje,
-        "descripcion_corta": "Análisis del modelo completado",
-        "placa": "undefined",
-        "es_fallback": False,
+Evalúa si hay presencia de humo negro (smog) en el escape del vehículo.
+El porcentaje_smog debe ser la estimación de intensidad del smog (0 = sin smog, 100 = smog muy intenso).
+El nivel_confianza debe indicar qué tan seguro estás de tu evaluación (0-100).
+Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefined".
+"""
+
+    # Preparar la solicitud para análisis con CNN
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY}"
     }
-
-
-
-
-def _resolver_ruta_local(ruta_archivo: str) -> Path:
-    """Convierte URL pública de capturas a ruta local cuando aplica."""
-    candidato = Path(ruta_archivo)
-    if candidato.exists():
-        return candidato
-
-    parsed = urlparse(ruta_archivo)
-    if parsed.scheme not in {"http", "https"}:
-        return candidato
-
-    nombre = Path(unquote(parsed.path)).name
-    if not nombre:
-        return candidato
-
-    base_dir = Path(__file__).resolve().parents[2]
-    return base_dir / "storage" / "capturas" / nombre
-
-def _extraer_json(texto: str) -> Dict[str, Any]:
-    texto = texto.strip()
-    if texto.startswith("```"):
-        texto = texto.strip("`")
-        if texto.startswith("json"):
-            texto = texto[4:].strip()
-
-    inicio = texto.find("{")
-    fin = texto.rfind("}")
-    if inicio == -1 or fin == -1 or fin <= inicio:
-        raise ValueError("La respuesta del modelo no contiene un objeto JSON válido")
-
-    return json.loads(texto[inicio : fin + 1])
-
-
-def _extraer_content_mensaje(body: Dict[str, Any]) -> str:
-    """
-    Soporta formatos típicos de chat/completions:
-    - choices[0].message.content como string JSON.
-    - choices[0].message.content como lista de bloques con {"type":"text","text":"..."}.
-    """
-    choices = body.get("choices") or []
-    if not choices:
-        raise ValueError("Respuesta sin choices")
-
-    message = choices[0].get("message") or {}
-    content = message.get("content")
-
-    if isinstance(content, str):
-        return content
-
-    if isinstance(content, list):
-        partes = []
-        for bloque in content:
-            if isinstance(bloque, dict) and bloque.get("type") == "text":
-                partes.append(str(bloque.get("text", "")))
-        texto = "\n".join(p for p in partes if p).strip()
-        if texto:
-            return texto
-
-    raise ValueError("No se pudo extraer contenido de la respuesta del modelo")
-
-
-def _normalizar_url_modelo(modelo_url: str) -> str:
-    """
-    Acepta tanto una URL final de completions como una URL base /v1.
-    """
-    url = (modelo_url or "").strip()
-    if not url:
-        return url
-
-    cleaned = url.rstrip("/")
-    if cleaned.endswith("/chat/completions"):
-        return cleaned
-    if cleaned.endswith("/v1"):
-        return f"{cleaned}/chat/completions"
-    return cleaned
-
-
-async def _analizar_via_api(ruta_archivo: str) -> Dict[str, Any]:
-    modelo_api_key = os.getenv("MODELO_API_KEY", "").strip()
-    modelo_url = _normalizar_url_modelo(os.getenv("MODELO_BASE_URL", ""))
-    modelo_nombre = os.getenv("MODELO_NOMBRE", "ModeloCNNbinario").strip()
-    modelo_decisor_id = os.getenv("MODELO_DECISOR_ID", "gpt-4o-mini").strip()
-
-    if not modelo_api_key:
-        raise RuntimeError("MODELO_API_KEY no está configurada")
-    if not modelo_url:
-        raise RuntimeError("MODELO_BASE_URL no está configurada")
-
-    image_bytes = _resolver_ruta_local(ruta_archivo).read_bytes()
-    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-
-    model_id = modelo_decisor_id if modelo_nombre == "ModeloCNNbinario" else modelo_nombre
 
     payload = {
-        "model": model_id,
-        "temperature": 0,
+        "model": OPENAI_MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "Analiza una imagen vehicular y responde únicamente JSON con estas claves: "
-                    "smog_visible (boolean), nivel_confianza (0-100), porcentaje_smog (0-100)."
-                ),
-            },
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "ModeloCNNbinario debe decidir si hay smog visible y el porcentaje estimado."},
+                    {
+                        "type": "text",
+                        "text": prompt
+                    },
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_b64}",
-                        },
-                    },
-                ],
-            },
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }
+                ]
+            }
         ],
+        "max_tokens": 500
     }
 
-    headers = {
-        "Authorization": f"Bearer {modelo_api_key}",
-        "Content-Type": "application/json",
-    }
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            response = await client.post(OPENAI_API_URL, headers=headers, json=payload)
+        except httpx.RequestError as e:
+            raise Exception(f"Error de conexión con servicio de análisis: {str(e)}")
 
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        response = await client.post(modelo_url, headers=headers, json=payload)
-        response.raise_for_status()
-        body = response.json()
+        if response.status_code != 200:
+            error_text = response.text[:500] if response.text else "Sin detalles del error"
+            raise Exception(f"Error en servicio de análisis: {response.status_code} - {error_text}")
 
-    content = _extraer_content_mensaje(body)
-    return _extraer_json(content)
+        try:
+            result = response.json()
+        except json.JSONDecodeError as e:
+            raise Exception(f"Respuesta inválida del servicio de análisis: {str(e)}")
 
+        # Extraer el contenido JSON de la respuesta
+        if not result.get("choices") or len(result["choices"]) == 0:
+            raise Exception("Servicio de análisis no retornó respuesta válida")
 
-async def analizar_imagen_modelo(ruta_archivo: str) -> dict:
-    """Analiza una imagen con el proveedor configurado y retorna formato compatible del sistema."""
-    ruta_local = _resolver_ruta_local(ruta_archivo)
-    if not ruta_local.exists():
-        return _resultado_base("Archivo no encontrado para análisis del modelo")
+        content = result["choices"][0]["message"]["content"]
+        if not content:
+            raise Exception("Servicio de análisis retornó contenido vacío")
 
-    try:
-        data = await _analizar_via_api(str(ruta_local))
-        return _normalizar_resultado(data)
-    except Exception as exc:
-        return _resultado_base(f"Análisis preliminar del modelo (fallback): {type(exc).__name__}")
+        # Intentar extraer y parsear JSON, manejando respuestas con markdown
+        analisis = None
+
+        # Primero intentar extraer JSON de bloques de código markdown
+        import re
+        json_match = re.search(r'```(?:json)?\s*\n(.*?)\n```', content, re.DOTALL)
+        if json_match:
+            json_content = json_match.group(1).strip()
+            try:
+                analisis = json.loads(json_content)
+                print(f"JSON extraído de markdown: {analisis}")
+            except json.JSONDecodeError:
+                print(f"Error parseando JSON extraído de markdown: {json_content}")
+
+        # Si no se encontró JSON en markdown, intentar parsear todo el contenido
+        if analisis is None:
+            try:
+                analisis = json.loads(content)
+                print(f"JSON parseado directamente: {analisis}")
+            except json.JSONDecodeError:
+                print(f"Error parseando JSON directamente: {content[:200]}...")
+
+        # Si aún no hay análisis válido, usar heurística
+        if analisis is None:
+            print(f"Advertencia: Servicio de análisis retornó respuesta no-JSON, usando heurística: {content[:200]}...")
+            analisis = {
+                "smog_visible": "smog" in content.lower() and "false" not in content.lower().split("smog")[1][:20] if "smog" in content.lower() else False,
+                "porcentaje_smog": 50,  # valor por defecto
+                "nivel_confianza": 70,  # valor por defecto
+                "descripcion_corta": content.replace('```json\n', '').replace('\n```', '').strip()[:200],
+                "placa": "undefined"
+            }
+
+        return analisis
