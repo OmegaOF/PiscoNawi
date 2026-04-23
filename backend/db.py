@@ -209,7 +209,6 @@ class Imagen(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     ubicacion_id = Column(BIGINT(unsigned=True), ForeignKey("ubicaciones.id"), nullable=True)
     dispositivo_captura_id = Column(Integer, ForeignKey("dispositivos_captura.id"), nullable=True)
-    testCampo = Column(String(50), nullable=True)
     usuario = relationship("Usuario", back_populates="imagenes")
     ubicacion = relationship("Ubicacion", back_populates="imagenes")
     dispositivo_captura = relationship("DispositivoCaptura", back_populates="imagenes")

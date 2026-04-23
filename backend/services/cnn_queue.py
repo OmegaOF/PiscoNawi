@@ -228,7 +228,7 @@ def _run_post_processing_analysis(db: Session):
     This automatically enhances predictions for today's images.
     """
     try:
-        from services.modelo_service import analizar_imagen_modelo
+        from services.modelo_service import analizar_imagen_openai
         # Get today's date (start of day)
         today = date.today()
         start_of_day = datetime.combine(today, datetime.min.time())
@@ -256,7 +256,7 @@ def _run_post_processing_analysis(db: Session):
                 # We need to run async function in sync context
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                resultado = loop.run_until_complete(analizar_imagen_modelo(imagen.ruta_archivo))
+                resultado = loop.run_until_complete(analizar_imagen_openai(imagen.ruta_archivo))
                 loop.close()
 
                 # Update the prediction
