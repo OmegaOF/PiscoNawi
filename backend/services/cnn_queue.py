@@ -183,7 +183,7 @@ def _worker(
 
             time.sleep(0.2)
 
-        # ✅ After CNN processing completes, automatically run additional analysis
+        # ✅ After CNN processing completes, automatically run additional last analysis of results
         _run_post_processing_analysis(db)
 
     except Exception as e:
@@ -228,7 +228,7 @@ def _run_post_processing_analysis(db: Session):
     This automatically enhances predictions for today's images.
     """
     try:
-        from services.modelo_service import analizar_imagen_openai
+        from services.modelo_service import analizar_imagen_cnn_model_step
         # Get today's date (start of day)
         today = date.today()
         start_of_day = datetime.combine(today, datetime.min.time())
@@ -251,15 +251,12 @@ def _run_post_processing_analysis(db: Session):
                 if not prediccion:
                     print("modelo no encontrado")
                     continue
-
-                # Analyze with additional service
                 # We need to run async function in sync context
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                resultado = loop.run_until_complete(analizar_imagen_openai(imagen.ruta_archivo))
+                resultado = loop.run_until_complete(analizar_imagen_cnn_model_step(imagen.ruta_archivo))
                 loop.close()
 
-                # Update the prediction
                 prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
                 prediccion.confianza = resultado["nivel_confianza"] / 100.0
                 prediccion.p_smog = resultado["porcentaje_smog"] / 100.0

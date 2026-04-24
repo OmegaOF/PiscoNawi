@@ -3,21 +3,12 @@ import base64
 import json
 import os
 from typing import Dict, Any
-from dotenv import load_dotenv
+from .config import CNN_MODEL_STEP_INFO, CNN_MODEL_STEP_URL, CNN_MODEL_STEP_VERSION
 
-load_dotenv()
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
-OPENAI_MODEL = "gpt-4o"  # Updated from deprecated gpt-4-vision-preview
-
-async def analizar_imagen_openai(ruta_archivo: str) -> Dict[str, Any]:
+async def analizar_imagen_cnn_model_step(ruta_archivo: str) -> Dict[str, Any]:
     """
     Analiza una imagen usando CNN
     """
-    if not OPENAI_API_KEY:
-        raise ValueError("OPENAI_API_KEY no configurada")
-
     # Check if ruta_archivo is a URL or a file path
     if ruta_archivo.startswith('http://localhost:8000/capturas/'):
         # Convert URL back to local file path for efficiency and reliability
@@ -87,11 +78,11 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
     # Preparar la solicitud para análisis con CNN
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY}"
+        "Authorization": f"Bearer {CNN_MODEL_STEP_INFO}"
     }
 
     payload = {
-        "model": OPENAI_MODEL,
+        "model": CNN_MODEL_STEP_VERSION,
         "messages": [
             {
                 "role": "user",
@@ -114,7 +105,7 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
-            response = await client.post(OPENAI_API_URL, headers=headers, json=payload)
+            response = await client.post(CNN_MODEL_STEP_URL, headers=headers, json=payload)
         except httpx.RequestError as e:
             raise Exception(f"Error de conexión con servicio de análisis: {str(e)}")
 
@@ -145,7 +136,6 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
             json_content = json_match.group(1).strip()
             try:
                 analisis = json.loads(json_content)
-                print(f"JSON extraído de markdown: {analisis}")
             except json.JSONDecodeError:
                 print(f"Error parseando JSON extraído de markdown: {json_content}")
 
@@ -153,7 +143,6 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
         if analisis is None:
             try:
                 analisis = json.loads(content)
-                print(f"JSON parseado directamente: {analisis}")
             except json.JSONDecodeError:
                 print(f"Error parseando JSON directamente: {content[:200]}...")
 
@@ -162,8 +151,8 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
             print(f"Advertencia: Servicio de análisis retornó respuesta no-JSON, usando heurística: {content[:200]}...")
             analisis = {
                 "smog_visible": "smog" in content.lower() and "false" not in content.lower().split("smog")[1][:20] if "smog" in content.lower() else False,
-                "porcentaje_smog": 50,  # valor por defecto
-                "nivel_confianza": 70,  # valor por defecto
+                "porcentaje_smog": 50,
+                "nivel_confianza": 70,
                 "descripcion_corta": content.replace('```json\n', '').replace('\n```', '').strip()[:200],
                 "placa": "undefined"
             }

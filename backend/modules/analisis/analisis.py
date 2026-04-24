@@ -83,9 +83,9 @@ async def analizar_con_ia(
     if not prediccion:
         raise HTTPException(status_code=404, detail="Predicción no encontrada para esta imagen")
 
-    from backend.services.modelo_service import analizar_imagen_openai
+    from backend.services.modelo_service import analizar_imagen_cnn_model_step
     try:
-        resultado = await analizar_imagen_openai(imagen.ruta_archivo)
+        resultado = await analizar_imagen_cnn_model_step(imagen.ruta_archivo)
         prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
         prediccion.confianza = resultado["nivel_confianza"] / 100.0
         prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
@@ -266,7 +266,7 @@ async def analizar_todas_imagenes_hoy(
     failed_count = 0
     errors = []
 
-    from services.modelo_service import analizar_imagen_openai
+    from services.modelo_service import analizar_imagen_cnn_model_step
     for imagen in images_with_predictions:
         processed_count += 1
         try:
@@ -276,7 +276,7 @@ async def analizar_todas_imagenes_hoy(
                 errors.append(f"Predicción no encontrada para imagen {imagen.id}")
                 continue
 
-            resultado = await analizar_imagen_openai(imagen.ruta_archivo)
+            resultado = await analizar_imagen_cnn_model_step(imagen.ruta_archivo)
             prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
             prediccion.confianza = resultado["nivel_confianza"] / 100.0
             prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
