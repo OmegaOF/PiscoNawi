@@ -203,3 +203,28 @@ async def listar_imagenes_capturadas(current_user: Usuario = Depends(require_int
         ))
 
     return captured_images
+
+@router.delete("/eliminar/{filename}")
+async def eliminar_imagen(filename: str, current_user: Usuario = Depends(require_internal_user)):
+    try:
+        # Prevent directory traversal attacks
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(status_code=400, detail="Nombre de archivo inválido")
+
+        filepath = os.path.join(CAPTURA_DIR, filename)
+
+        # Verify file is in CAPTURA_DIR
+        if not os.path.abspath(filepath).startswith(os.path.abspath(CAPTURA_DIR)):
+            raise HTTPException(status_code=400, detail="Ruta de archivo inválida")
+
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=404, detail="Imagen no encontrada")
+
+        # Delete the file
+        os.remove(filepath)
+        return {"message": f"Imagen {filename} eliminada exitosamente"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al eliminar imagen: {str(e)}")

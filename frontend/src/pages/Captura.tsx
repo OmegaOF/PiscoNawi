@@ -95,6 +95,16 @@ const Captura: React.FC = () => {
     });
   };
 
+  const handleDeleteImage = async (filename: string) => {
+    try {
+      await api.delete(`/captura/eliminar/${filename}`);
+      setImages(images.filter(img => img.filename !== filename));
+    } catch (err) {
+      console.error('Error deleting image:', err);
+      setError('Error al eliminar imagen');
+    }
+  };
+
 
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -159,13 +169,20 @@ const Captura: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {images.map((image) => (
                 <div key={image.filename} className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="aspect-w-4 aspect-h-3 bg-gray-100">
+                  <div className="aspect-w-4 aspect-h-3 bg-gray-100 relative group">
                     <img
                       src={image.url}
                       alt={image.filename}
                       className="w-full h-48 object-cover"
                       loading="lazy"
                     />
+                    <button
+                      onClick={() => handleDeleteImage(image.filename)}
+                      className="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-700"
+                      title="Eliminar imagen"
+                    >
+                      ✕
+                    </button>
                   </div>
                   <div className="p-3">
                     <p className="text-sm font-medium text-gray-900 truncate">{image.filename}</p>
