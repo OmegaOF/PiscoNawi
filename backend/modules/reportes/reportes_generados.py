@@ -17,7 +17,19 @@ from modules.reportes.reports import TablaResumenRow, fetch_tabla_resumen_data
 router = APIRouter()
 
 TIPO_REPORTE_TABLA_RESUMEN = "tabla_resumen"
-REPORTES_SOPORTADOS = {TIPO_REPORTE_TABLA_RESUMEN}
+TIPO_REPORTE_GENERAL = "reporte_general"
+TIPO_REPORTE_CAMBIOS_TIEMPO = "cambios_tiempo"
+TIPO_REPORTE_COMPARACION = "comparacion"
+TIPO_REPORTE_POR_ZONAS = "por_zonas"
+TIPO_REPORTE_DETALLADO = "detallado"
+REPORTES_SOPORTADOS = {
+    TIPO_REPORTE_TABLA_RESUMEN,
+    TIPO_REPORTE_GENERAL,
+    TIPO_REPORTE_CAMBIOS_TIEMPO,
+    TIPO_REPORTE_COMPARACION,
+    TIPO_REPORTE_POR_ZONAS,
+    TIPO_REPORTE_DETALLADO,
+}
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 REPORTS_STORAGE_DIR = BASE_DIR / "storage" / "reports"
@@ -104,6 +116,25 @@ def _render_tabla_resumen_pdf(file_path: Path, rows: List[TablaResumenRow], payl
     pdf.save()
 
 
+def _render_pdf_by_tipo(
+    tipo_reporte: str,
+    file_path: Path,
+    rows: List[TablaResumenRow],
+    payload: ExportarPDFPayload,
+) -> None:
+    """Dispatcher base para renderizado de PDFs por tipo de reporte."""
+    if tipo_reporte == TIPO_REPORTE_TABLA_RESUMEN:
+        _render_tabla_resumen_pdf(file_path, rows, payload)
+        return
+
+    # Tipos reconocidos, pendientes de implementación en siguientes pasos.
+    raise HTTPException(
+        status_code=501,
+        detail=f"tipo_reporte '{tipo_reporte}' reconocido pero aún no implementado",
+    )
+
+
+
 @router.post("/exportar-pdf", response_model=ExportarPDFResponse)
 async def exportar_reporte_pdf(
     payload: ExportarPDFPayload,
@@ -131,8 +162,7 @@ async def exportar_reporte_pdf(
     absolute_path = REPORTS_STORAGE_DIR / filename
     relative_path = str(Path("storage") / "reports" / filename)
 
-    if payload.tipo_reporte == TIPO_REPORTE_TABLA_RESUMEN:
-        _render_tabla_resumen_pdf(absolute_path, rows, payload)
+    _render_pdf_by_tipo(payload.tipo_reporte, absolute_path, rows, payload)
 
     report_row = ReporteGenerado(
         nombre_reporte=payload.tipo_reporte,

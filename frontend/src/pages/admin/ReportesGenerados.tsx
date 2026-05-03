@@ -16,6 +16,10 @@ const ReportesGenerados: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [form, setForm] = useState({ tipo_reporte: 'tabla_resumen', desde: '', hasta: '', agrupar: 'dia' });
 
+  const requiereAgrupacion = (tipoReporte: string) => {
+    return ['tabla_resumen', 'reporte_general', 'cambios_tiempo', 'detallado'].includes(tipoReporte);
+  };
+
   const load = async () => {
     try {
       const res = await api.get<ReporteGeneradoResponse[]>('/reportes-generados');
@@ -75,14 +79,26 @@ const ReportesGenerados: React.FC = () => {
         <form onSubmit={exportPdf} className="bg-white border border-gray-200 rounded-lg p-4 mb-6 grid md:grid-cols-5 gap-3">
           <select className="border rounded px-3 py-2" value={form.tipo_reporte} onChange={(e) => setForm({ ...form, tipo_reporte: e.target.value })}>
             <option value="tabla_resumen">tabla_resumen</option>
+            <option value="reporte_general">reporte_general</option>
+            <option value="cambios_tiempo">cambios_tiempo</option>
+            <option value="comparacion">comparacion</option>
+            <option value="por_zonas">por_zonas</option>
+            <option value="detallado">detallado</option>
+
           </select>
           <input className="border rounded px-3 py-2" type="date" value={form.desde} onChange={(e) => setForm({ ...form, desde: e.target.value })} />
-          <input className="border rounded px-3 py-2" type="date" value={form.hasta} onChange={(e) => setForm({ ...form, hasta: e.target.value })} />
-          <select className="border rounded px-3 py-2" value={form.agrupar} onChange={(e) => setForm({ ...form, agrupar: e.target.value })}>
-            <option value="dia">día</option>
-            <option value="semana">semana</option>
-            <option value="mes">mes</option>
-          </select>
+          <input className="border rounded px-3 py-2" type="date" value={form.hasta} onChange={(e) => setForm({ ...form, hasta: e.target.value })} />         {requiereAgrupacion(form.tipo_reporte) ? (
+            <select className="border rounded px-3 py-2" value={form.agrupar} onChange={(e) => setForm({ ...form, agrupar: e.target.value })}>
+              <option value="dia">día</option>
+              <option value="semana">semana</option>
+              <option value="mes">mes</option>
+            </select>
+          ) : (
+            <div className="border rounded px-3 py-2 text-sm text-gray-500 bg-gray-50 flex items-center">
+              Sin agrupación para este tipo
+            </div>
+          )}
+
           <button className="bg-vino text-white rounded px-4 py-2" disabled={exporting}>{exporting ? 'Exportando...' : 'Exportar PDF'}</button>
         </form>
 
