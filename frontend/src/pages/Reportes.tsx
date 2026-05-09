@@ -106,9 +106,12 @@ const Reportes: React.FC = () => {
   const fetchReports = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const params: Record<string, string> = { agrupar };
-    if (desde) params.desde = desde;
-    if (hasta) params.hasta = hasta;
+    const dateParams: Record<string, string> = {};
+    if (desde) dateParams.desde = desde;
+    if (hasta) dateParams.hasta = hasta;
+    const groupedParams: Record<string, string> = { ...dateParams, agrupar };
+
+
 
     try {
       const [
@@ -122,15 +125,16 @@ const Reportes: React.FC = () => {
         userRes,
         tablaRes,
       ] = await Promise.all([
-        api.get<KPIs>(`${API_BASE}/kpis`),
-        api.get<ClasePredichaItem[]>(`${API_BASE}/clase-predicha`),
-        api.get<TendenciaItem[]>(`${API_BASE}/tendencia-predicciones`, { params }),
-        api.get<TendenciaItem[]>(`${API_BASE}/tendencia-imagenes`, { params }),
-        api.get<HistogramBucket[]>(`${API_BASE}/distribucion-confianza`),
-        api.get<HistogramBucket[]>(`${API_BASE}/distribucion-p-smog`),
-        api.get<PorUbicacionItem[]>(`${API_BASE}/por-ubicacion`),
-        api.get<PorUsuarioItem[]>(`${API_BASE}/por-usuario`),
-        api.get<TablaResumenRow[]>(`${API_BASE}/tabla-resumen`, { params }),
+        api.get<KPIs>(`${API_BASE}/kpis`, { params: dateParams }),
+        api.get<ClasePredichaItem[]>(`${API_BASE}/clase-predicha`, { params: dateParams }),
+        api.get<TendenciaItem[]>(`${API_BASE}/tendencia-predicciones`, { params: groupedParams }),
+        api.get<TendenciaItem[]>(`${API_BASE}/tendencia-imagenes`, { params: groupedParams }),
+        api.get<HistogramBucket[]>(`${API_BASE}/distribucion-confianza`, { params: dateParams }),
+        api.get<HistogramBucket[]>(`${API_BASE}/distribucion-p-smog`, { params: dateParams }),
+        api.get<PorUbicacionItem[]>(`${API_BASE}/por-ubicacion`, { params: dateParams }),
+        api.get<PorUsuarioItem[]>(`${API_BASE}/por-usuario`, { params: dateParams }),
+        api.get<TablaResumenRow[]>(`${API_BASE}/tabla-resumen`, { params: groupedParams }),
+
       ]);
 
 
@@ -181,36 +185,38 @@ const Reportes: React.FC = () => {
     : [];
 
   return (
-    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <div className="px-4 py-6 sm:px-0">
-        <h1 className="text-3xl font-bold text-vino mb-6">Reportes y Gráficos</h1>
+    <div className="max-w-7xl mx-auto py-4 sm:px-6 lg:px-8">
+      <div className="px-4 py-4 sm:px-0">
+        <h1 className="text-3xl font-bold text-vino mb-4">Reportes y Gráficos</h1>
+
 
         {/* Filtros */}
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-4 mb-6 flex flex-wrap gap-4 items-end">
-          <div>
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-3 mb-4">
+          <div className="flex flex-wrap lg:flex-nowrap gap-3 items-end">
+          <div className="min-w-[160px] flex-1">
+
             <label className="block text-sm font-medium text-gray-700 mb-1">Desde</label>
             <input
               type="date"
               value={desde}
               onChange={(e) => setDesde(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
             />
           </div>
-          <div>
+          <div className="min-w-[160px] flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
             <input
               type="date"
               value={hasta}
               onChange={(e) => setHasta(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-            />
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"            />
           </div>
-          <div>
+          <div className="min-w-[150px] lg:w-44">
             <label className="block text-sm font-medium text-gray-700 mb-1">Agrupar por</label>
             <select
               value={agrupar}
               onChange={(e) => setAgrupar(e.target.value as 'dia' | 'semana' | 'mes')}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
             >
               <option value="dia">Día</option>
               <option value="semana">Semana</option>
@@ -219,10 +225,11 @@ const Reportes: React.FC = () => {
           </div>
           <button
             onClick={fetchReports}
-            className="bg-rojo-tinto text-white px-4 py-2 rounded-md text-sm font-medium hover:opacity-90"
+            className="h-10 px-4 bg-rojo-tinto text-white rounded-md text-sm font-medium hover:opacity-90 whitespace-nowrap"
           >
             Actualizar
           </button>
+          </div>
         </div>
 
         {/* 1. KPI Cards + Gauge */}

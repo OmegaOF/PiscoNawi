@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
@@ -13,6 +13,12 @@ from sqlalchemy.orm import Session
 from db import ReporteGenerado, Usuario, get_db
 from modules.roles.roles import ROLE_ADMIN, ROLE_ANALISTA, ROLE_DEV, get_user_roles, require_roles
 from modules.reportes.reports import TablaResumenRow, fetch_tabla_resumen_data
+from modules.reportes.reporte_detallado import generar_reporte_detallado_pdf
+from modules.reportes.reporte_comparacion import generar_reporte_comparacion_pdf
+from modules.reportes.reporte_cambios_tiempo import generar_reporte_cambios_tiempo_pdf
+from modules.reportes.reporte_por_zonas import generar_reporte_por_zonas_pdf
+from modules.reportes.reporte_general import generar_reporte_general_pdf
+
 
 router = APIRouter()
 
@@ -77,7 +83,8 @@ def _render_tabla_resumen_pdf(file_path: Path, rows: List[TablaResumenRow], payl
     pdf.drawString(40, y, "Reporte: tabla_resumen")
     y -= 20
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(40, y, f"Fecha de generación (UTC): {datetime.utcnow().isoformat()}Z")
+    fecha_bolivia = (datetime.utcnow() - timedelta(hours=4)).strftime("%Y-%m-%d %H:%M")
+    pdf.drawString(40, y, f"Fecha de generación: {fecha_bolivia} (hora Bolivia)")
     y -= 15
     pdf.drawString(40, y, f"Filtros -> desde: {payload.desde or 'N/A'} | hasta: {payload.hasta or 'N/A'} | agrupar: {payload.agrupar}")
     y -= 25
@@ -116,23 +123,29 @@ def _render_tabla_resumen_pdf(file_path: Path, rows: List[TablaResumenRow], payl
     pdf.save()
 
 
-def _render_pdf_by_tipo(
+async def _render_pdf_by_tipo(
     tipo_reporte: str,
     file_path: Path,
     rows: List[TablaResumenRow],
     payload: ExportarPDFPayload,
-) -> None:
+    db: Session,
+    user: Usuario,
+) -> int:
     """Dispatcher base para renderizado de PDFs por tipo de reporte."""
     if tipo_reporte == TIPO_REPORTE_TABLA_RESUMEN:
         _render_tabla_resumen_pdf(file_path, rows, payload)
-        return
-
-    # Tipos reconocidos, pendientes de implementación en siguientes pasos.
-    raise HTTPException(
-        status_code=501,
-        detail=f"tipo_reporte '{tipo_reporte}' reconocido pero aún no implementado",
-    )
-
+        return len(rows)
+    if tipo_reporte == TIPO_REPORTE_DETALLADO:
+        return generar_reporte_detallado_pdf(file_path, db, payload, user.nombre)
+    if tipo_reporte == TIPO_REPORTE_COMPARACION:
+        return generar_reporte_comparacion_pdf(file_path, db, payload, user.nombre)
+    if tipo_reporte == TIPO_REPORTE_CAMBIOS_TIEMPO:
+        return await generar_reporte_cambios_tiempo_pdf(file_path, db, payload, user.nombre, user)
+    if tipo_reporte == TIPO_REPORTE_POR_ZONAS:
+        return generar_reporte_por_zonas_pdf(file_path, db, payload, user.nombre)
+    if tipo_reporte == TIPO_REPORTE_GENERAL:
+        return await generar_reporte_general_pdf(file_path, db, payload, user.nombre, user)
+    raise HTTPException(status_code=400, detail="tipo_reporte no soportado")
 
 
 @router.post("/exportar-pdf", response_model=ExportarPDFResponse)
@@ -162,7 +175,7 @@ async def exportar_reporte_pdf(
     absolute_path = REPORTS_STORAGE_DIR / filename
     relative_path = str(Path("storage") / "reports" / filename)
 
-    _render_pdf_by_tipo(payload.tipo_reporte, absolute_path, rows, payload)
+    total_exportados = await _render_pdf_by_tipo(payload.tipo_reporte, absolute_path, rows, payload, db, user)
 
     report_row = ReporteGenerado(
         nombre_reporte=payload.tipo_reporte,
@@ -182,7 +195,7 @@ async def exportar_reporte_pdf(
             usuario_id=report_row.usuario_id,
             ruta_archivo=report_row.ruta_archivo,
         ),
-        total_registros_exportados=len(rows),
+        total_registros_exportados=total_exportados,
     )
 
 

@@ -98,34 +98,56 @@ async def get_kpis(
         user: Usuario = Depends(
             require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
+        desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+        hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+
 ):
     """Totals and averages for KPI cards and gauge."""
-    total_imagenes = db.query(func.count(Imagen.id)).scalar() or 0
-    total_predicciones = db.query(func.count(Prediccion.id)).scalar() or 0
+    d = _parse_date(desde)
+    h = _parse_date(hasta)
 
-    smog_count = (
-        db.query(func.count(Prediccion.id))
-        .filter(Prediccion.clase_predicha == "smog")
-        .scalar()
-    ) or 0
-    pct_smog = (smog_count / total_predicciones * 100.0) if total_predicciones else 0.0
-
-    confianza_avg = (
-        db.query(func.avg(Prediccion.confianza)).scalar()
-    )
-    confianza_promedio = float(confianza_avg) if confianza_avg is not None else 0.0
-
-    ubicaciones_activas = (
+    q_img_total = db.query(func.count(Imagen.id))
+    q_pred_total = db.query(func.count(Prediccion.id))
+    q_smog_count = db.query(func.count(Prediccion.id)).filter(Prediccion.clase_predicha == "smog")
+    q_confianza_avg = db.query(func.avg(Prediccion.confianza))
+    q_ubicaciones_activas = (
         db.query(func.count(func.distinct(Imagen.ubicacion_id)))
         .filter(Imagen.ubicacion_id.isnot(None))
-        .scalar()
-    ) or 0
+    )
+    q_usuarios_activos = (
 
-    usuarios_activos = (
         db.query(func.count(func.distinct(Imagen.usuario_id)))
         .filter(Imagen.usuario_id.isnot(None))
-        .scalar()
-    ) or 0
+    )
+
+    if d is not None:
+        dt_from = datetime.combine(d, datetime.min.time())
+        q_img_total = q_img_total.filter(Imagen.fecha_subida >= dt_from)
+        q_pred_total = q_pred_total.filter(Prediccion.fecha_prediccion >= dt_from)
+        q_smog_count = q_smog_count.filter(Prediccion.fecha_prediccion >= dt_from)
+        q_confianza_avg = q_confianza_avg.filter(Prediccion.fecha_prediccion >= dt_from)
+        q_ubicaciones_activas = q_ubicaciones_activas.filter(Imagen.fecha_subida >= dt_from)
+        q_usuarios_activos = q_usuarios_activos.filter(Imagen.fecha_subida >= dt_from)
+    if h is not None:
+        dt_to = datetime.combine(h + timedelta(days=1), datetime.min.time())
+        q_img_total = q_img_total.filter(Imagen.fecha_subida < dt_to)
+        q_pred_total = q_pred_total.filter(Prediccion.fecha_prediccion < dt_to)
+        q_smog_count = q_smog_count.filter(Prediccion.fecha_prediccion < dt_to)
+        q_confianza_avg = q_confianza_avg.filter(Prediccion.fecha_prediccion < dt_to)
+        q_ubicaciones_activas = q_ubicaciones_activas.filter(Imagen.fecha_subida < dt_to)
+        q_usuarios_activos = q_usuarios_activos.filter(Imagen.fecha_subida < dt_to)
+
+    total_imagenes = q_img_total.scalar() or 0
+    total_predicciones = q_pred_total.scalar() or 0
+
+    smog_count = q_smog_count.scalar() or 0
+    pct_smog = (smog_count / total_predicciones * 100.0) if total_predicciones else 0.0
+
+    confianza_avg = q_confianza_avg.scalar()
+    confianza_promedio = float(confianza_avg) if confianza_avg is not None else 0.0
+
+    ubicaciones_activas = q_ubicaciones_activas.scalar() or 0
+    usuarios_activos = q_usuarios_activos.scalar() or 0
 
     return KPIsResponse(
         total_imagenes=total_imagenes,
@@ -142,13 +164,20 @@ async def get_clase_predicha(
         user: Usuario = Depends(
             require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
+        desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+        hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+
 ):
     """Counts by predicted class (smog / sin_smog) for pie and bar charts."""
-    rows = (
-        db.query(Prediccion.clase_predicha, func.count(Prediccion.id))
-        .group_by(Prediccion.clase_predicha)
-        .all()
-    )
+    q = db.query(Prediccion.clase_predicha, func.count(Prediccion.id))
+    d = _parse_date(desde)
+    h = _parse_date(hasta)
+    if d is not None:
+        q = q.filter(Prediccion.fecha_prediccion >= datetime.combine(d, datetime.min.time()))
+    if h is not None:
+        q = q.filter(Prediccion.fecha_prediccion < datetime.combine(h + timedelta(days=1), datetime.min.time()))
+    rows = q.group_by(Prediccion.clase_predicha).all()
+
     return [
         ClasePredichaItem(clase=clase or "sin_clasificar", cantidad=count)
         for clase, count in rows
@@ -282,19 +311,30 @@ async def get_distribucion_confianza(
         user: Usuario = Depends(
             require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
+        desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+        hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+
 ):
     """Confidence distribution buckets for histogram."""
     result = []
+    d = _parse_date(desde)
+    h = _parse_date(hasta)
+
     for low, high in BUCKETS:
         label = f"{low:.1f}-{high:.1f}" if high <= 1.0 else "0.8-1.0"
-        count = (
+        q = (
             db.query(func.count(Prediccion.id))
             .filter(
                 Prediccion.confianza >= low,
                 Prediccion.confianza < high,
             )
-            .scalar()
-        ) or 0
+        )
+        if d is not None:
+            q = q.filter(Prediccion.fecha_prediccion >= datetime.combine(d, datetime.min.time()))
+        if h is not None:
+            q = q.filter(Prediccion.fecha_prediccion < datetime.combine(h + timedelta(days=1), datetime.min.time()))
+        count = q.scalar() or 0
+
         result.append(HistogramBucket(rango=label, cantidad=count))
     return result
 
@@ -304,19 +344,29 @@ async def get_distribucion_p_smog(
         user: Usuario = Depends(
             require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
+        desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+        hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+
 ):
     """p_smog distribution buckets for histogram."""
     result = []
+    d = _parse_date(desde)
+    h = _parse_date(hasta)
     for low, high in BUCKETS:
         label = f"{low:.1f}-{high:.1f}" if high <= 1.0 else "0.8-1.0"
-        count = (
+        q = (
             db.query(func.count(Prediccion.id))
             .filter(
                 Prediccion.p_smog >= low,
                 Prediccion.p_smog < high,
             )
-            .scalar()
-        ) or 0
+        )
+        if d is not None:
+            q = q.filter(Prediccion.fecha_prediccion >= datetime.combine(d, datetime.min.time()))
+        if h is not None:
+            q = q.filter(Prediccion.fecha_prediccion < datetime.combine(h + timedelta(days=1), datetime.min.time()))
+        count = q.scalar() or 0
+
         result.append(HistogramBucket(rango=label, cantidad=count))
     return result
 
@@ -326,9 +376,12 @@ async def get_por_ubicacion(
         user: Usuario = Depends(
             require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
+        desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+        hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+
 ):
     """Counts and % smog per location for bar chart and map."""
-    sub = (
+    q_sub = (
         db.query(
             Imagen.ubicacion_id,
             func.count(Prediccion.id).label("total"),
@@ -336,9 +389,17 @@ async def get_por_ubicacion(
         )
         .join(Prediccion, Imagen.id == Prediccion.imagen_id)
         .filter(Imagen.ubicacion_id.isnot(None))
-        .group_by(Imagen.ubicacion_id)
-        .subquery()
+
     )
+    d = _parse_date(desde)
+    h = _parse_date(hasta)
+    if d is not None:
+        q_sub = q_sub.filter(Prediccion.fecha_prediccion >= datetime.combine(d, datetime.min.time()))
+    if h is not None:
+        q_sub = q_sub.filter(Prediccion.fecha_prediccion < datetime.combine(h + timedelta(days=1), datetime.min.time()))
+    sub = q_sub.group_by(Imagen.ubicacion_id).subquery()
+
+
 
     rows = (
         db.query(
@@ -373,27 +434,41 @@ async def get_por_usuario(
         user: Usuario = Depends(
             require_roles(["Usuario analista", "Administrador", "Constructor del sistema"])),
         db: Session = Depends(get_db),
+        desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+        hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+
 ):
     """Image and prediction counts per user for bar chart."""
-    sub_img = (
+    d = _parse_date(desde)
+    h = _parse_date(hasta)
+    q_sub_img = (
         db.query(
             Imagen.usuario_id,
             func.count(Imagen.id).label("img_count"),
         )
         .filter(Imagen.usuario_id.isnot(None))
-        .group_by(Imagen.usuario_id)
-        .subquery()
+
     )
-    sub_pred = (
+    q_sub_pred = (
         db.query(
             Imagen.usuario_id,
             func.count(Prediccion.id).label("pred_count"),
         )
         .join(Prediccion, Imagen.id == Prediccion.imagen_id)
         .filter(Imagen.usuario_id.isnot(None))
-        .group_by(Imagen.usuario_id)
-        .subquery()
+
     )
+    if d is not None:
+        dt_from = datetime.combine(d, datetime.min.time())
+        q_sub_img = q_sub_img.filter(Imagen.fecha_subida >= dt_from)
+        q_sub_pred = q_sub_pred.filter(Prediccion.fecha_prediccion >= dt_from)
+    if h is not None:
+        dt_to = datetime.combine(h + timedelta(days=1), datetime.min.time())
+        q_sub_img = q_sub_img.filter(Imagen.fecha_subida < dt_to)
+        q_sub_pred = q_sub_pred.filter(Prediccion.fecha_prediccion < dt_to)
+    sub_img = q_sub_img.group_by(Imagen.usuario_id).subquery()
+    sub_pred = q_sub_pred.group_by(Imagen.usuario_id).subquery()
+
     rows = (
         db.query(
             Usuario.id,
