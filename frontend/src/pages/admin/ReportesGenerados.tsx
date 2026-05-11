@@ -14,10 +14,10 @@ const ReportesGenerados: React.FC = () => {
   const [selected, setSelected] = useState<ReporteGeneradoResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [form, setForm] = useState({ tipo_reporte: 'tabla_resumen', desde: '', hasta: '', agrupar: 'dia' });
+  const [form, setForm] = useState({ tipo_reporte: 'reporte_general', desde: '', hasta: '', agrupar: 'dia' });
 
   const requiereAgrupacion = (tipoReporte: string) => {
-    return ['tabla_resumen', 'reporte_general', 'cambios_tiempo', 'detallado'].includes(tipoReporte);
+    return ['reporte_general', 'cambios_tiempo', 'detallado'].includes(tipoReporte);
   };
 
   const load = async () => {
@@ -78,7 +78,6 @@ const ReportesGenerados: React.FC = () => {
 
         <form onSubmit={exportPdf} className="bg-white border border-gray-200 rounded-lg p-4 mb-6 grid md:grid-cols-5 gap-3">
           <select className="border rounded px-3 py-2" value={form.tipo_reporte} onChange={(e) => setForm({ ...form, tipo_reporte: e.target.value })}>
-            <option value="tabla_resumen">tabla_resumen</option>
             <option value="reporte_general">reporte_general</option>
             <option value="cambios_tiempo">cambios_tiempo</option>
             <option value="comparacion">comparacion</option>

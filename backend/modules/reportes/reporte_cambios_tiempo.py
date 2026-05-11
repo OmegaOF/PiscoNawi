@@ -1,6 +1,10 @@
 from pathlib import Path
 import tempfile
 
+import matplotlib
+
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import numpy as np
 from reportlab.lib.pagesizes import A4

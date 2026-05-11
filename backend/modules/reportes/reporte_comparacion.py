@@ -1,6 +1,10 @@
 from pathlib import Path
 import tempfile
 
+import matplotlib
+
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer

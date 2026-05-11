@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
@@ -6,13 +6,10 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 from sqlalchemy.orm import Session
 
 from db import ReporteGenerado, Usuario, get_db
 from modules.roles.roles import ROLE_ADMIN, ROLE_ANALISTA, ROLE_DEV, get_user_roles, require_roles
-from modules.reportes.reports import TablaResumenRow, fetch_tabla_resumen_data
 from modules.reportes.reporte_detallado import generar_reporte_detallado_pdf
 from modules.reportes.reporte_comparacion import generar_reporte_comparacion_pdf
 from modules.reportes.reporte_cambios_tiempo import generar_reporte_cambios_tiempo_pdf
@@ -22,14 +19,12 @@ from modules.reportes.reporte_general import generar_reporte_general_pdf
 
 router = APIRouter()
 
-TIPO_REPORTE_TABLA_RESUMEN = "tabla_resumen"
 TIPO_REPORTE_GENERAL = "reporte_general"
 TIPO_REPORTE_CAMBIOS_TIEMPO = "cambios_tiempo"
 TIPO_REPORTE_COMPARACION = "comparacion"
 TIPO_REPORTE_POR_ZONAS = "por_zonas"
 TIPO_REPORTE_DETALLADO = "detallado"
 REPORTES_SOPORTADOS = {
-    TIPO_REPORTE_TABLA_RESUMEN,
     TIPO_REPORTE_GENERAL,
     TIPO_REPORTE_CAMBIOS_TIEMPO,
     TIPO_REPORTE_COMPARACION,
@@ -74,67 +69,17 @@ def _build_report_filename(tipo_reporte: str, usuario_id: int) -> str:
     return f"{tipo_reporte}_{usuario_id}_{timestamp}_{uuid4().hex[:8]}.pdf"
 
 
-def _render_tabla_resumen_pdf(file_path: Path, rows: List[TablaResumenRow], payload: ExportarPDFPayload) -> None:
-    pdf = canvas.Canvas(str(file_path), pagesize=letter)
-    width, height = letter
-
-    y = height - 50
-    pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(40, y, "Reporte: tabla_resumen")
-    y -= 20
-    pdf.setFont("Helvetica", 10)
-    fecha_bolivia = (datetime.utcnow() - timedelta(hours=4)).strftime("%Y-%m-%d %H:%M")
-    pdf.drawString(40, y, f"Fecha de generación: {fecha_bolivia} (hora Bolivia)")
-    y -= 15
-    pdf.drawString(40, y, f"Filtros -> desde: {payload.desde or 'N/A'} | hasta: {payload.hasta or 'N/A'} | agrupar: {payload.agrupar}")
-    y -= 25
-
-    headers = ["Periodo", "Total", "Smog", "% Smog", "Confianza", "P(smog)"]
-    col_x = [40, 180, 240, 300, 370, 470]
-
-    pdf.setFont("Helvetica-Bold", 10)
-    for index, header in enumerate(headers):
-        pdf.drawString(col_x[index], y, header)
-    y -= 16
-    pdf.setFont("Helvetica", 9)
-
-    for row in rows:
-        if y <= 50:
-            pdf.showPage()
-            y = height - 50
-            pdf.setFont("Helvetica-Bold", 10)
-            for index, header in enumerate(headers):
-                pdf.drawString(col_x[index], y, header)
-            y -= 16
-            pdf.setFont("Helvetica", 9)
-
-        values = [
-            row.periodo,
-            str(row.total_predicciones),
-            str(row.total_smog),
-            f"{row.pct_smog:.2f}",
-            f"{row.confianza_promedio:.4f}",
-            f"{row.p_smog_promedio:.4f}",
-        ]
-        for index, value in enumerate(values):
-            pdf.drawString(col_x[index], y, value)
-        y -= 14
-
-    pdf.save()
 
 
 async def _render_pdf_by_tipo(
     tipo_reporte: str,
     file_path: Path,
-    rows: List[TablaResumenRow],
     payload: ExportarPDFPayload,
     db: Session,
     user: Usuario,
 ) -> int:
     """Dispatcher base para renderizado de PDFs por tipo de reporte."""
-    if tipo_reporte == TIPO_REPORTE_TABLA_RESUMEN:
-        _render_tabla_resumen_pdf(file_path, rows, payload)
-        return len(rows)
+
     if tipo_reporte == TIPO_REPORTE_DETALLADO:
         return generar_reporte_detallado_pdf(file_path, db, payload, user.nombre)
     if tipo_reporte == TIPO_REPORTE_COMPARACION:
@@ -160,23 +105,12 @@ async def exportar_reporte_pdf(
             detail=f"tipo_reporte no soportado. Soportados: {', '.join(sorted(REPORTES_SOPORTADOS))}",
         )
 
-    if payload.tipo_reporte == TIPO_REPORTE_TABLA_RESUMEN:
-        rows = fetch_tabla_resumen_data(
-            db=db,
-            desde=payload.desde,
-            hasta=payload.hasta,
-            agrupar=payload.agrupar,
-        )
-    else:
-        rows = []
-
     REPORTS_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     filename = _build_report_filename(payload.tipo_reporte, user.id)
     absolute_path = REPORTS_STORAGE_DIR / filename
     relative_path = str(Path("storage") / "reports" / filename)
 
-    total_exportados = await _render_pdf_by_tipo(payload.tipo_reporte, absolute_path, rows, payload, db, user)
-
+    total_exportados = await _render_pdf_by_tipo(payload.tipo_reporte, absolute_path, payload, db, user)
     report_row = ReporteGenerado(
         nombre_reporte=payload.tipo_reporte,
         fecha_generado=datetime.utcnow(),
