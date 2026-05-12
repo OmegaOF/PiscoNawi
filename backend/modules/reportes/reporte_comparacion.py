@@ -41,16 +41,16 @@ def generar_reporte_comparacion_pdf(file_path: Path, db, payload, usuario_nombre
     if total == 0:
         story.append(Paragraph(NO_DATA_MESSAGE, styles["Normal"]))
     else:
-        story.append(Paragraph(f"Total predicciones: {total}", styles["Normal"]))
-        story.append(Paragraph(f"Cantidad smog: {smog}", styles["Normal"]))
-        story.append(Paragraph(f"Cantidad sin smog: {sin_smog}", styles["Normal"]))
+        story.append(Paragraph(f"Total de análisis: {total}", styles["Normal"]))
+        story.append(Paragraph(f"Casos con smog: {smog}", styles["Normal"]))
+        story.append(Paragraph(f"Casos sin smog: {sin_smog}", styles["Normal"]))
         story.append(Spacer(1, 8))
         tmp_file = None
         try:
             tmp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
             fig, ax = plt.subplots(figsize=(6, 3.4), dpi=150)
-            ax.bar(["Smog", "Sin smog"], [smog, sin_smog], color=["#c0392b", "#27ae60"])
-            ax.set_title("Comparación de clases")
+            ax.bar(["Con smog", "Sin smog"], [smog, sin_smog], color=["#c0392b", "#27ae60"])
+            ax.set_title("Comparación de resultados")
             ax.set_ylabel("Cantidad")
             fig.tight_layout()
             fig.savefig(tmp_file.name)
@@ -58,8 +58,7 @@ def generar_reporte_comparacion_pdf(file_path: Path, db, payload, usuario_nombre
             story.append(Image(tmp_file.name, width=420, height=230))
         except Exception:
             story.append(Paragraph("No se pudo generar el gráfico para esta sección.", styles["Normal"]))
-        data = [["Clase", "Cantidad", "Porcentaje"], ["Smog", str(smog), f"{pct_smog:.2f}%"], ["Sin smog", str(sin_smog), f"{pct_sin:.2f}%"]]
-        story.append(Spacer(1, 8))
+        data = [["Resultado", "Cantidad", "Porcentaje"], ["Con smog", str(smog), f"{pct_smog:.2f}%"], ["Sin smog", str(sin_smog), f"{pct_sin:.2f}%"]]
         story.append(tabla_estilizada(data, [170, 120, 120]))
         story.append(Spacer(1, 8))
         story.append(caja_conclusion(observacion_por_pct_smog(pct_smog), styles))

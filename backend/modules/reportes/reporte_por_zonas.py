@@ -107,11 +107,11 @@ def generar_reporte_por_zonas_pdf(file_path: Path, db, payload, usuario_nombre: 
             story.append(Paragraph(mapa_error, styles["Normal"]))
 
         story.append(Spacer(1, 8))
-        story.append(Paragraph("Ranking de zonas por % smog", styles["SectionTitle"]))
-        data = [["Ubicación", "Total", "Smog", "Sin smog", "% smog", "Latitud", "Longitud"]]
+        story.append(Paragraph("Zonas con mayor % de smog", styles["SectionTitle"]))
+        data = [["Ubicación", "Total de análisis", "Con smog", "Sin smog", "% con smog", "Latitud", "Longitud"]]
         for z in zonas:
             data.append([z["ubicacion"], str(z["total"]), str(z["smog"]), str(z["sin_smog"]), f"{z['pct_smog']:.2f}%", str(z["lat"] or "N/A"), str(z["lon"] or "N/A")])
-        story.append(tabla_estilizada(data, [65, 45, 45, 55, 55, 85, 85]))
+        story.append(tabla_estilizada(data, [60, 95, 70, 70, 75, 75, 78]))
         top = zonas[0]
         story.append(Spacer(1, 8))
         story.append(caja_conclusion(f"La zona con mayor smog fue {top['ubicacion']} con {top['pct_smog']:.2f}%.", styles))

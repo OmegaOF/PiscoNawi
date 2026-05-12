@@ -31,7 +31,7 @@ async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nomb
     if total_pred == 0:
         story.append(Paragraph(NO_DATA_MESSAGE, styles["Normal"]))
     else:
-        story.append(kpi_cards([("Total imágenes", str(total_img)), ("Total predicciones", str(total_pred)), ("% smog", f"{pct_smog:.2f}%"), ("Confianza promedio", f"{conf_avg:.4f}"), ("P(smog) promedio", f"{p_smog_avg:.4f}"), ("Periodo", payload.agrupar)]))
+        story.append(kpi_cards([("Total imágenes", str(total_img)), ("Total de análisis", str(total_pred)), ("% con smog", f"{pct_smog:.2f}%"), ("Confianza promedio", f"{conf_avg:.4f}"), ("Smog promedio", f"{p_smog_avg:.4f}"), ("Periodo", payload.agrupar)]))
         story.append(Spacer(1, 10))
 
         # Cambios en el tiempo
@@ -47,7 +47,7 @@ async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nomb
         sin_smog = total_pred - total_smog
         story.append(Spacer(1, 8))
         story.append(Paragraph("Comparación", styles["SectionTitle"]))
-        cmp_data = [["Clase", "Cantidad", "Porcentaje"], ["Smog", str(smog), f"{safe_pct(smog,total_pred):.2f}%"], ["Sin smog", str(sin_smog), f"{safe_pct(sin_smog,total_pred):.2f}%"]]
+        cmp_data = [["Resultado", "Cantidad", "Porcentaje"], ["Con smog", str(smog), f"{safe_pct(smog,total_pred):.2f}%"], ["Sin smog", str(sin_smog), f"{safe_pct(sin_smog,total_pred):.2f}%"]]
         story.append(tabla_estilizada(cmp_data, [130, 120, 120]))
 
         # Zonas
@@ -64,15 +64,15 @@ async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nomb
             except Exception:
                 story.append(Paragraph("No se pudo generar el mapa para esta sección.", styles["Small"]))
         if top_zonas:
-            zonas_data = [["Ubicación", "Total", "Smog", "% smog"]] + [[z["ubicacion"], str(z["total"]), str(z["smog"]), f"{z['pct_smog']:.2f}%"] for z in top_zonas]
-            story.append(tabla_estilizada(zonas_data, [130, 80, 80, 80]))
+            zonas_data = [["Ubicación", "Total de análisis", "Casos con smog", "% con smog"]] + [[z["ubicacion"], str(z["total"]), str(z["smog"]), f"{z['pct_smog']:.2f}%"] for z in top_zonas]
+            story.append(tabla_estilizada(zonas_data, [120, 105, 105, 85]))
 
         story.append(Spacer(1, 8))
-        story.append(Paragraph("Tabla resumen", styles["SectionTitle"]))
-        data = [["Periodo", "Total predicciones", "Total smog", "% smog", "Confianza promedio", "P(smog) promedio"]]
+        story.append(Paragraph("Resumen por periodo", styles["SectionTitle"]))
+        data = [["Periodo", "Total de análisis", "Casos con smog", "% con smog", "Confianza promedio", "Smog promedio"]]
         for r in rows:
             data.append([r.periodo, str(r.total_predicciones), str(r.total_smog), f"{r.pct_smog:.2f}", f"{r.confianza_promedio:.4f}", f"{r.p_smog_promedio:.4f}"])
-        story.append(tabla_estilizada(data, [80, 90, 70, 55, 95, 85]))
+        story.append(tabla_estilizada(data, [70, 95, 90, 78, 105, 85]))
         story.append(Spacer(1, 8))
         story.append(caja_conclusion(observacion_por_pct_smog(pct_smog), styles))
 

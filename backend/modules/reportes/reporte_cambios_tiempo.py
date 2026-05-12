@@ -21,8 +21,8 @@ def generar_grafico_cambios_barras_png(rows):
     width = 0.24
 
     fig, ax = plt.subplots(figsize=(8.0, 4.1), dpi=170)
-    bars_total = ax.bar(x - width, [r.total for r in rows], width=width, color="#2e86de", label="Total")
-    bars_smog = ax.bar(x, [r.smog for r in rows], width=width, color="#c0392b", label="Smog")
+    bars_total = ax.bar(x - width, [r.total for r in rows], width=width, color="#2e86de", label="Total de análisis")
+    bars_smog = ax.bar(x, [r.smog for r in rows], width=width, color="#c0392b", label="Con smog")
     bars_sin = ax.bar(x + width, [r.sin_smog for r in rows], width=width, color="#27ae60", label="Sin smog")
 
     ax.set_title("Cambios en el tiempo", fontsize=13, fontweight="bold")
@@ -60,10 +60,10 @@ async def generar_reporte_cambios_tiempo_pdf(file_path: Path, db, payload, usuar
             story.append(Paragraph("No se pudo generar el gráfico para esta sección.", styles["Normal"]))
 
         story.append(Spacer(1, 8))
-        data = [["Periodo", "Total", "Smog", "Sin smog", "% smog"]]
+        data = [["Periodo", "Total de análisis", "Con smog", "Sin smog", "% con smog"]]
         for r in rows:
             data.append([r.periodo, str(r.total), str(r.smog), str(r.sin_smog), f"{safe_pct(r.smog, r.total):.2f}%"])
-        story.append(tabla_estilizada(data, [95, 60, 60, 70, 70]))
+        story.append(tabla_estilizada(data, [105, 105, 85, 85, 85]))
         story.append(Spacer(1, 8))
         story.append(caja_conclusion("Los valores se mantienen estables durante el periodo analizado.", styles))
 
