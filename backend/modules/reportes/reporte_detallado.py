@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import List
 
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
@@ -11,13 +13,14 @@ from modules.reportes.utils_reportes import NO_DATA_MESSAGE, build_page_callback
 def generar_reporte_detallado_pdf(file_path: Path, db, payload, usuario_nombre: str) -> int:
     rows: List[TablaResumenRow] = fetch_tabla_resumen_data(db=db, desde=payload.desde, hasta=payload.hasta, agrupar=payload.agrupar)
     styles = build_styles()
+    table_title_style = ParagraphStyle("CenteredSectionTitle", parent=styles["SectionTitle"], alignment=TA_CENTER)
     story = []
     portada_simple(story, styles, "Reporte Detallado", usuario_nombre, payload.desde, payload.hasta, payload.agrupar)
 
     if not rows:
         story.append(Paragraph(NO_DATA_MESSAGE, styles["Normal"]))
     else:
-        story.append(Paragraph("Tabla por periodo", styles["SectionTitle"]))
+        story.append(Paragraph("Tabla por periodo", table_title_style))
         data = [["Periodo", "Total de análisis", "Casos con smog", "% con smog", "Confianza promedio", "Smog promedio"]]
         for r in rows:
             data.append([r.periodo, str(r.total_predicciones), str(r.total_smog), f"{r.pct_smog:.2f}", f"{r.confianza_promedio:.4f}", f"{r.p_smog_promedio:.4f}"])

@@ -1,5 +1,7 @@
 from pathlib import Path
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer
 from sqlalchemy import func
 
@@ -23,6 +25,7 @@ async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nomb
     pct_smog = safe_pct(total_smog, total_pred)
 
     styles = build_styles()
+    table_title_style = ParagraphStyle("CenteredSectionTitle", parent=styles["SectionTitle"], alignment=TA_CENTER)
     story = []
     portada_simple(story, styles, "Reporte General", usuario_nombre, payload.desde, payload.hasta, payload.agrupar)
     story.append(Paragraph("El reporte resume los resultados obtenidos por el sistema durante el periodo seleccionado.", styles["Normal"]))
@@ -46,13 +49,13 @@ async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nomb
         smog = total_smog
         sin_smog = total_pred - total_smog
         story.append(Spacer(1, 8))
-        story.append(Paragraph("Comparación", styles["SectionTitle"]))
+        story.append(Paragraph("Comparación", table_title_style))
         cmp_data = [["Resultado", "Cantidad", "Porcentaje"], ["Con smog", str(smog), f"{safe_pct(smog,total_pred):.2f}%"], ["Sin smog", str(sin_smog), f"{safe_pct(sin_smog,total_pred):.2f}%"]]
         story.append(tabla_estilizada(cmp_data, [130, 120, 120]))
 
         # Zonas
         story.append(Spacer(1, 8))
-        story.append(Paragraph("Zonas", styles["SectionTitle"]))
+        story.append(Paragraph("Zonas", table_title_style))
         top_zonas = zonas[:5]
         if zonas:
             try:
@@ -68,7 +71,7 @@ async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nomb
             story.append(tabla_estilizada(zonas_data, [120, 105, 105, 85]))
 
         story.append(Spacer(1, 8))
-        story.append(Paragraph("Resumen por periodo", styles["SectionTitle"]))
+        story.append(Paragraph("Resumen por periodo", table_title_style))
         data = [["Periodo", "Total de análisis", "Casos con smog", "% con smog", "Confianza promedio", "Smog promedio"]]
         for r in rows:
             data.append([r.periodo, str(r.total_predicciones), str(r.total_smog), f"{r.pct_smog:.2f}", f"{r.confianza_promedio:.4f}", f"{r.p_smog_promedio:.4f}"])

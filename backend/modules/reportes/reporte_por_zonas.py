@@ -2,7 +2,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import tempfile
 
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer
 from sqlalchemy import case, func
 from staticmap import CircleMarker, StaticMap
@@ -90,6 +92,7 @@ def generar_mapa_zonas_png(zonas):
 def generar_reporte_por_zonas_pdf(file_path: Path, db, payload, usuario_nombre: str) -> int:
     zonas = _query_zonas(db, payload.desde, payload.hasta)
     styles = build_styles()
+    table_title_style = ParagraphStyle("CenteredSectionTitle", parent=styles["SectionTitle"], alignment=TA_CENTER)
     story = []
     portada_simple(story, styles, "Reporte por Zonas", usuario_nombre, payload.desde, payload.hasta)
 
@@ -107,7 +110,7 @@ def generar_reporte_por_zonas_pdf(file_path: Path, db, payload, usuario_nombre: 
             story.append(Paragraph(mapa_error, styles["Normal"]))
 
         story.append(Spacer(1, 8))
-        story.append(Paragraph("Zonas con mayor % de smog", styles["SectionTitle"]))
+        story.append(Paragraph("Zonas con mayor % de smog", table_title_style))
         data = [["Ubicación", "Total de análisis", "Con smog", "Sin smog", "% con smog", "Latitud", "Longitud"]]
         for z in zonas:
             data.append([z["ubicacion"], str(z["total"]), str(z["smog"]), str(z["sin_smog"]), f"{z['pct_smog']:.2f}%", str(z["lat"] or "N/A"), str(z["lon"] or "N/A")])
