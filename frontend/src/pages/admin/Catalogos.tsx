@@ -127,7 +127,7 @@ const Catalogos: React.FC = () => {
               />
               <input
                 className="border rounded px-3 py-2"
-                placeholder="ISO"
+                placeholder="Código ISO (ej: BO)"
                 value={paisForm.codigo_iso}
                 onChange={(e) => setPaisForm({ ...paisForm, codigo_iso: e.target.value })}
               />

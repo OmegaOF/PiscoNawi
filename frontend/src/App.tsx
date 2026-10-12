@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -6,7 +6,6 @@ import Captura from './pages/Captura';
 import Analisis from './pages/Analisis';
 import AnalisisMasivo from './pages/AnalisisMasivo';
 import ProcesarCapturas from './pages/ProcesarCapturas';
-import Reportes from './pages/Reportes';
 import HistorialOperador from './pages/HistorialOperador';
 import Navbar from './components/Navbar';
 import FooterArt from './components/FooterArt';
@@ -19,11 +18,26 @@ import RolesAdmin from './pages/admin/RolesAdmin';
 import DispositivosAdmin from './pages/admin/DispositivosAdmin';
 import ConfiguracionesSistema from './pages/admin/ConfiguracionesSistema';
 import Catalogos from './pages/admin/Catalogos';
-import ReportesGenerados from './pages/admin/ReportesGenerados';
 import Perfil from './pages/admin/Perfil';
+import { PresentationProvider, usePresentation } from './contexts/PresentationContext';
+import { ToastProvider } from './components/ui/Toast';
+
+const Reportes = React.lazy(() => import('./pages/Reportes'));
+const ReportesGenerados = React.lazy(() => import('./pages/admin/ReportesGenerados'));
+const Placas = React.lazy(() => import('./pages/Placas'));
+
+const PageSpinner = () => (
+  <div className="flex min-h-[400px] items-center justify-center">
+    <div className="text-center">
+      <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-rojo-tinto" />
+      <p className="mt-4 text-gray-500">Cargando…</p>
+    </div>
+  </div>
+);
 
 function AppContent() {
  const { isAuthenticated, loading } = useAuth();
+  const { active: presentacionActiva } = usePresentation();
 
   if (loading) {
     return (
@@ -39,14 +53,16 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-neutral-bg to-caki">
-      {isAuthenticated && <Navbar />}
+      {isAuthenticated && !presentacionActiva && <Navbar />}
       <main className={isAuthenticated ? 'pt-20' : ''}>
+        <Suspense fallback={<PageSpinner />}>
         <Routes>
                    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/captura" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><Captura /></ProtectedRoute>} />
           <Route path="/procesar-capturas" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><ProcesarCapturas /></ProtectedRoute>} />
           <Route path="/analisis" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><Analisis /></ProtectedRoute>} />
           <Route path="/analisis-masivo" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><AnalisisMasivo /></ProtectedRoute>} />
+          <Route path="/placas" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><Placas /></ProtectedRoute>} />
           <Route path="/reportes" element={<ProtectedRoute allowedRoles={[ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><Reportes /></ProtectedRoute>} />
           <Route path="/mi-historial" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ADMIN, ROLE_DEV]}><HistorialOperador /></ProtectedRoute>} />
 
@@ -60,9 +76,9 @@ function AppContent() {
 
           <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
         </Routes>
-
+        </Suspense>
       </main>
-      {isAuthenticated && <FooterArt />}
+      {isAuthenticated && !presentacionActiva && <FooterArt />}
     </div>
   );
 }
@@ -70,9 +86,13 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <PresentationProvider>
+        <ToastProvider>
+          <Router>
+            <AppContent />
+          </Router>
+        </ToastProvider>
+      </PresentationProvider>
     </AuthProvider>
   );
 }

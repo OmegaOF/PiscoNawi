@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../lib/api';
 
 interface AnalisisItem {
@@ -84,7 +85,7 @@ const Analisis: React.FC = () => {
                       Confianza
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      P Smog
+                      Prob. de smog
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Observación
@@ -116,9 +117,12 @@ const Analisis: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm font-mono font-semibold text-gray-900">
                           {item.placa_manual || '-'}
                         </div>
+                        <Link to={`/placas?imagen=${item.imagen_id}`} className="text-xs font-medium text-rojo-tinto hover:underline">
+                          {item.placa_manual ? 'Editar placa' : 'Registrar placa'}
+                        </Link>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -126,7 +130,7 @@ const Analisis: React.FC = () => {
                             ? 'bg-red-100 text-red-800'
                             : 'bg-green-100 text-green-800'
                         }`}>
-                          {item.clase_predicha}
+                          {item.clase_predicha === 'smog' ? 'Con smog' : item.clase_predicha === 'sin_smog' ? 'Sin smog' : item.clase_predicha}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

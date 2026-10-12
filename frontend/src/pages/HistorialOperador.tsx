@@ -70,7 +70,7 @@ const HistorialOperador: React.FC = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Placa</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Clase</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Confianza</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">P Smog</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Prob. de smog</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Observación</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Fecha</th>
                   </tr>
@@ -84,7 +84,7 @@ const HistorialOperador: React.FC = () => {
                         <div className="text-xs text-gray-500">{item.ruta_archivo || '—'}</div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-800">{item.placa_manual || '—'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-800">{item.clase_predicha || '—'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-800">{item.clase_predicha === 'smog' ? 'Con smog' : item.clase_predicha === 'sin_smog' ? 'Sin smog' : item.clase_predicha || '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{formatNumber(item.confianza)}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{formatNumber(item.p_smog)}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{item.observacion || '—'}</td>

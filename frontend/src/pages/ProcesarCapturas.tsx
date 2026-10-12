@@ -223,7 +223,7 @@ const ProcesarCapturas: React.FC = () => {
       console.error('Error starting CNN:', err);
       setProcessingCNN(false);
       setProgress(0);
-      setError(err.response?.data?.detail || 'Error starting CNN processing');
+      setError(err.response?.data?.detail || 'Error al iniciar el procesamiento CNN');
     }
   };
 

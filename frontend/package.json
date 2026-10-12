@@ -10,6 +10,8 @@
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.16",
     "axios": "^1.6.2",
+    "echarts": "^5.6.0",
+    "echarts-for-react": "^3.0.6",
     "framer-motion": "^12.29.0",
     "leaflet": "^1.9.4",
     "postcss": "^8.4.32",
@@ -18,8 +20,8 @@
     "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.20.1",
     "react-scripts": "5.0.1",
-    "recharts": "^3.7.0",
     "tailwindcss": "^3.3.6",
+    "tesseract.js": "^5.1.1",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
@@ -49,6 +51,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.16",
+    "playwright": "^1.64.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6"
   }

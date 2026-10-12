@@ -70,7 +70,7 @@ const Navbar: React.FC = () => {
             <div className="flex-shrink-0 flex items-center">
               <img
                 src="/vermilion-2.png"
-                alt="Pisco Nawi Icon"
+                alt="Logotipo de Pisco Ñawi IA"
                 className="w-8 h-8 mr-3"
               />
               <h1 className="text-xl font-bold">PISCONAWI IA</h1>
@@ -132,7 +132,7 @@ const Navbar: React.FC = () => {
             <button
               className="md:hidden p-2 rounded-md hover:bg-white/20 transition-colors"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
-              aria-label="Toggle navigation menu"
+              aria-label="Abrir o cerrar el menú de navegación"
             >
               {mobileMenuOpen ? (
                 <XMarkIcon className="h-6 w-6" />

@@ -87,7 +87,7 @@ const UsuariosAdmin: React.FC = () => {
         {(canCreate || (canEdit && editing)) && (
           <form onSubmit={editing ? handleUpdate : handleCreate} className="bg-white border border-gray-200 rounded-lg p-4 mb-6 grid md:grid-cols-4 gap-3">
             <input className="border rounded px-3 py-2" placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required />
-            <input className="border rounded px-3 py-2" placeholder="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
+            <input className="border rounded px-3 py-2" placeholder="Nombre de usuario" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
             <input className="border rounded px-3 py-2" placeholder={editing ? 'Nueva contraseña (opcional)' : 'Contraseña'} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!editing} />
             <div className="flex gap-2">
               <button className="bg-vino text-white rounded px-4 py-2" type="submit">{editing ? 'Guardar cambios' : 'Crear usuario'}</button>
@@ -103,7 +103,7 @@ const UsuariosAdmin: React.FC = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">ID</th>
                   <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Nombre</th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Username</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Nombre de usuario</th>
                   <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Creado</th>
                   <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Acciones</th>
                 </tr>

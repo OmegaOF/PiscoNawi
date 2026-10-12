@@ -1,521 +1,111 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import api from '../lib/api';
-import {
-  PieChart,
-  Pie,
-  BarChart,
-  Bar,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
-  RadialBarChart,
-  RadialBar,
-} from 'recharts';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-
-const API_BASE = '/reports';
-
-interface KPIs {
-  total_imagenes: number;
-  total_predicciones: number;
-  pct_smog: number;
-  confianza_promedio: number;
-  ubicaciones_activas: number;
-  usuarios_activos: number;
-}
-
-interface ClasePredichaItem {
-  clase: string;
-  cantidad: number;
-}
-
-interface TendenciaItem {
-  periodo: string;
-  total: number;
-  smog: number;
-  sin_smog: number;
-}
-
-interface HistogramBucket {
-  rango: string;
-  cantidad: number;
-}
-
-interface PorUbicacionItem {
-  ubicacion_id: number;
-  nombre: string | null;
-  latitud: number;
-  longitud: number;
-  total: number;
-  smog: number;
-  sin_smog: number;
-  pct_smog: number;
-}
-
-interface PorUsuarioItem {
-  usuario_id: number;
-  nombre: string;
-  username: string;
-  total_imagenes: number;
-  total_predicciones: number;
-}
-
-interface TablaResumenRow {
-  periodo: string;
-  total_predicciones: number;
-  total_smog: number;
-  pct_smog: number;
-  confianza_promedio: number;
-  p_smog_promedio: number;
-}
-
-const COLORS = ['#7A1E2B', '#2d5a27', '#C6B38E', '#6B1F2B', '#1E1E1E'];
-
-function getSmogColor(pct: number): string {
-  if (pct >= 70) return '#7A1E2B';
-  if (pct >= 40) return '#b45309';
-  return '#2d5a27';
-}
+import React, { useMemo } from 'react';
+import { useReportFilters } from '../hooks/useReportFilters';
+import { useReportsData } from '../hooks/useReportsData';
+import { useSection } from '../hooks/useSection';
+import { reportsApi } from '../lib/reportsApi';
+import { usePresentation } from '../contexts/PresentationContext';
+import FilterBar from '../components/reports/FilterBar';
+import PresentationShell from '../components/reports/PresentationShell';
+import NivelBadge from '../components/reports/NivelBadge';
+import { SECTIONS } from './reportes/sections';
+import HeroSection from './reportes/sections/HeroSection';
+import MapaSection from './reportes/sections/MapaSection';
+import EvolucionSection from './reportes/sections/EvolucionSection';
+import PatronHorarioSection from './reportes/sections/PatronHorarioSection';
+import ModeloSection from './reportes/sections/ModeloSection';
+import GaleriaSection from './reportes/sections/GaleriaSection';
+import PlacasSection from './reportes/sections/PlacasSection';
+import OperacionSection from './reportes/sections/OperacionSection';
+import TablaSection from './reportes/sections/TablaSection';
+import { fmtInt } from '../lib/format';
 
 const Reportes: React.FC = () => {
-  const [desde, setDesde] = useState<string>('');
-  const [hasta, setHasta] = useState<string>('');
-  const [agrupar, setAgrupar] = useState<'dia' | 'semana' | 'mes'>('dia');
+  const { filters, preset, setFilters, applyPreset, rangeLabel } = useReportFilters('6m');
+  const { enabled: presentacion } = usePresentation();
+  const data = useReportsData(filters, { topLimit: 12 });
+  const zonasCat = useSection(reportsApi.zonasCatalogo, 'zonas-catalogo');
+  const dispCat = useSection(reportsApi.dispositivos, 'dispositivos-catalogo');
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const exportHref = useMemo(() => {
+    const p = new URLSearchParams({ tipo: 'reporte_general', agrupar: filters.agrupar });
+    if (filters.desde) p.set('desde', filters.desde);
+    if (filters.hasta) p.set('hasta', filters.hasta);
+    return `/reportes-generados?${p.toString()}`;
+  }, [filters]);
 
-  const [kpis, setKpis] = useState<KPIs | null>(null);
-  const [clasePredicha, setClasePredicha] = useState<ClasePredichaItem[]>([]);
-  const [tendenciaPredicciones, setTendenciaPredicciones] = useState<TendenciaItem[]>([]);
-  const [tendenciaImagenes, setTendenciaImagenes] = useState<TendenciaItem[]>([]);
-  const [distribucionConfianza, setDistribucionConfianza] = useState<HistogramBucket[]>([]);
-  const [distribucionPSmog, setDistribucionPSmog] = useState<HistogramBucket[]>([]);
-  const [porUbicacion, setPorUbicacion] = useState<PorUbicacionItem[]>([]);
-  const [porUsuario, setPorUsuario] = useState<PorUsuarioItem[]>([]);
-  const [tablaResumen, setTablaResumen] = useState<TablaResumenRow[]>([]);
+  const props = { data, filters, rangeLabel };
+  const sections = (
+    <>
+      <HeroSection {...props} />
+      <MapaSection {...props} />
+      <EvolucionSection {...props} />
+      <PatronHorarioSection {...props} />
+      <ModeloSection {...props} />
+      <GaleriaSection {...props} />
+      <PlacasSection {...props} />
+      <OperacionSection {...props} />
+      <TablaSection {...props} />
+    </>
+  );
 
-  const fetchReports = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const dateParams: Record<string, string> = {};
-    if (desde) dateParams.desde = desde;
-    if (hasta) dateParams.hasta = hasta;
-    const groupedParams: Record<string, string> = { ...dateParams, agrupar };
-
-
-
-    try {
-      const [
-        kpisRes,
-        claseRes,
-        tendPredRes,
-        tendImgRes,
-        distConfRes,
-        distSmogRes,
-        ubicRes,
-        userRes,
-        tablaRes,
-      ] = await Promise.all([
-        api.get<KPIs>(`${API_BASE}/kpis`, { params: dateParams }),
-        api.get<ClasePredichaItem[]>(`${API_BASE}/clase-predicha`, { params: dateParams }),
-        api.get<TendenciaItem[]>(`${API_BASE}/tendencia-predicciones`, { params: groupedParams }),
-        api.get<TendenciaItem[]>(`${API_BASE}/tendencia-imagenes`, { params: groupedParams }),
-        api.get<HistogramBucket[]>(`${API_BASE}/distribucion-confianza`, { params: dateParams }),
-        api.get<HistogramBucket[]>(`${API_BASE}/distribucion-p-smog`, { params: dateParams }),
-        api.get<PorUbicacionItem[]>(`${API_BASE}/por-ubicacion`, { params: dateParams }),
-        api.get<PorUsuarioItem[]>(`${API_BASE}/por-usuario`, { params: dateParams }),
-        api.get<TablaResumenRow[]>(`${API_BASE}/tabla-resumen`, { params: groupedParams }),
-
-      ]);
-
-
-      setKpis(kpisRes.data);
-      setClasePredicha(claseRes.data);
-      setTendenciaPredicciones(tendPredRes.data);
-      setTendenciaImagenes(tendImgRes.data);
-      setDistribucionConfianza(distConfRes.data);
-      setDistribucionPSmog(distSmogRes.data);
-      setPorUbicacion(ubicRes.data);
-      setPorUsuario(userRes.data);
-      setTablaResumen(tablaRes.data);
-    } catch (err: unknown) {
-      const msg = (err as any)?.response?.data?.detail || (err as any)?.message || String(err);
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [desde, hasta, agrupar]);
-
-  useEffect(() => {
-    fetchReports();
-  }, [fetchReports]);
-
-  if (loading && !kpis) {
+  if (presentacion) {
+    const k = data.kpis.data;
     return (
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rojo-tinto mx-auto" />
-          <p className="text-gray-500 mt-4">Cargando reportes...</p>
-        </div>
-      </div>
+      <PresentationShell
+        title="Pisco Ñawi IA · Monitoreo de smog vehicular"
+        subtitle={k ? `${fmtInt(k.total_predicciones)} vehículos analizados en ${rangeLabel}` : `Resultados de ${rangeLabel}`}
+        sections={SECTIONS.map(({ id, label }) => ({ id, label }))}
+      >
+        {sections}
+      </PresentationShell>
     );
   }
 
-  if (error) {
-    return (
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          Error al cargar reportes: {error}
-        </div>
-      </div>
-    );
-  }
-
-  const gaugeData = kpis
-    ? [{ name: 'Smog', value: kpis.pct_smog, fill: getSmogColor(kpis.pct_smog) }]
-    : [];
-
+  const k = data.kpis.data;
   return (
-    <div className="max-w-7xl mx-auto py-4 sm:px-6 lg:px-8">
-      <div className="px-4 py-4 sm:px-0">
-        <h1 className="text-3xl font-bold text-vino mb-4">Reportes y Gráficos</h1>
-
-
-        {/* Filtros */}
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-3 mb-4">
-          <div className="flex flex-wrap lg:flex-nowrap gap-3 items-end">
-          <div className="min-w-[160px] flex-1">
-
-            <label className="block text-sm font-medium text-gray-700 mb-1">Desde</label>
-            <input
-              type="date"
-              value={desde}
-              onChange={(e) => setDesde(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-            />
-          </div>
-          <div className="min-w-[160px] flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
-            <input
-              type="date"
-              value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"            />
-          </div>
-          <div className="min-w-[150px] lg:w-44">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Agrupar por</label>
-            <select
-              value={agrupar}
-              onChange={(e) => setAgrupar(e.target.value as 'dia' | 'semana' | 'mes')}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-            >
-              <option value="dia">Día</option>
-              <option value="semana">Semana</option>
-              <option value="mes">Mes</option>
-            </select>
-          </div>
-          <button
-            onClick={fetchReports}
-            className="h-10 px-4 bg-rojo-tinto text-white rounded-md text-sm font-medium hover:opacity-90 whitespace-nowrap"
-          >
-            Actualizar
-          </button>
-          </div>
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+      <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">Pisco Ñawi IA</p>
+          <h1 className="text-3xl font-extrabold text-vino sm:text-4xl">Panel de reportes</h1>
+          <p className="mt-1 text-sm text-text-muted">
+            Detección de smog vehicular en {rangeLabel}
+            {k ? ` · ${fmtInt(k.total_predicciones)} vehículos analizados` : ''}
+          </p>
         </div>
+        {k && k.total_predicciones > 0 && <NivelBadge pct={k.pct_smog} smog={k.total_smog} size="lg" showPct />}
+      </header>
 
-        {/* 1. KPI Cards + Gauge */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-vino mb-4">Resumen general</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-            {kpis && (
-              <>
-                <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500 uppercase">Total imágenes</p>
-                  <p className="text-2xl font-bold text-vino">{kpis.total_imagenes}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500 uppercase">Total predicciones</p>
-                  <p className="text-2xl font-bold text-vino">{kpis.total_predicciones}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500 uppercase">% con smog</p>
-                  <p className="text-2xl font-bold" style={{ color: getSmogColor(kpis.pct_smog) }}>
-                    {kpis.pct_smog.toFixed(1)}%
-                  </p>
-                </div>
-                <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500 uppercase">Confianza promedio</p>
-                  <p className="text-2xl font-bold text-vino">
-                    {(kpis.confianza_promedio * 100).toFixed(1)}%
-                  </p>
-                </div>
-                <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500 uppercase">Ubicaciones activas</p>
-                  <p className="text-2xl font-bold text-vino">{kpis.ubicaciones_activas}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500 uppercase">Usuarios activos</p>
-                  <p className="text-2xl font-bold text-vino">{kpis.usuarios_activos}</p>
-                </div>
-              </>
-            )}
-          </div>
-          {/* Gauge: % smog */}
-          {kpis && (
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 flex flex-col items-center">
-              <p className="text-sm font-medium text-gray-700 mb-2">Tasa global de smog</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <RadialBarChart
-                  innerRadius="60%"
-                  outerRadius="100%"
-                  data={gaugeData}
-                  startAngle={180}
-                  endAngle={0}
-                >
-                  <RadialBar background dataKey="value" cornerRadius={8} />
-                  <Tooltip formatter={(value: number | undefined) => [value != null ? `${value.toFixed(1)}%` : '—', 'Smog']} />
-                </RadialBarChart>
-              </ResponsiveContainer>
-              <p className="text-3xl font-bold mt-2" style={{ color: getSmogColor(kpis.pct_smog) }}>
-                {kpis.pct_smog.toFixed(1)}%
-              </p>
-            </div>
-          )}
-        </section>
+      <FilterBar
+        filters={filters}
+        preset={preset}
+        onPreset={applyPreset}
+        onChange={setFilters}
+        zonas={zonasCat.data || []}
+        dispositivos={dispCat.data || []}
+        loading={data.anyLoading}
+        onReload={data.reloadAll}
+        exportHref={exportHref}
+      />
 
-        {/* 2. Pie + Bar clase predicha */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-vino mb-4">Emisiones por resultado (clase predicha)</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={clasePredicha}
-                    dataKey="cantidad"
-                    nameKey="clase"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label
-                  >
-                    {clasePredicha.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={clasePredicha} layout="vertical" margin={{ left: 60 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis type="category" dataKey="clase" width={80} />
-                  <Tooltip />
-                  <Bar dataKey="cantidad" fill="#7A1E2B" name="Cantidad" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </section>
+      <nav className="no-scrollbar -mx-4 mb-8 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" aria-label="Ir a sección">
+        {SECTIONS.map((s, i) => (
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-text-dark ring-1 ring-neutral-border transition hover:text-rojo-tinto hover:ring-rojo-tinto/40"
+          >
+            <s.icon className="h-3.5 w-3.5" />
+            <span className="text-text-muted">{String(i + 1).padStart(2, '0')}</span> {s.label}
+          </a>
+        ))}
+      </nav>
 
-        {/* 3. Tendencia predicciones: Line/Area + stacked */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-vino mb-4">Tendencia de predicciones en el tiempo</h2>
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-            <ResponsiveContainer width="100%" height={320}>
-              <AreaChart data={tendenciaPredicciones}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="periodo" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Area type="monotone" dataKey="smog" stackId="1" stroke="#7A1E2B" fill="#7A1E2B" fillOpacity={0.7} name="Smog" />
-                <Area type="monotone" dataKey="sin_smog" stackId="1" stroke="#2d5a27" fill="#2d5a27" fillOpacity={0.7} name="Sin smog" />
-                <Line type="monotone" dataKey="total" stroke="#1E1E1E" strokeWidth={2} name="Total" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-
-        {/* 4. Tendencia imágenes */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-vino mb-4">Imágenes subidas por período</h2>
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={tendenciaImagenes}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="periodo" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="total" fill="#C6B38E" name="Imágenes" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-
-        {/* 5. Histogramas confianza y p_smog */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-vino mb-4">Distribución del modelo</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">Confianza</p>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={distribucionConfianza}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="rango" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="cantidad" fill="#6B1F2B" name="Cantidad" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">Probabilidad de smog (p_smog)</p>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={distribucionPSmog}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="rango" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="cantidad" fill="#7A1E2B" name="Cantidad" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </section>
-
-        {/* 6. Por ubicación: Bar + Map */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-vino mb-4">Emisiones por ubicación</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart
-                  data={porUbicacion.map((u) => ({
-                    ...u,
-                    nombre: u.nombre || `Ubicación ${u.ubicacion_id}`,
-                  }))}
-                  margin={{ bottom: 80 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="nombre" angle={-35} textAnchor="end" height={70} interval={0} />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="smog" stackId="a" fill="#7A1E2B" name="Smog" />
-                  <Bar dataKey="sin_smog" stackId="a" fill="#2d5a27" name="Sin smog" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-              {porUbicacion.length > 0 ? (
-                <div className="h-[320px] rounded overflow-hidden">
-                  <MapContainer
-                    center={[porUbicacion[0].latitud, porUbicacion[0].longitud]}
-                    zoom={12}
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    {porUbicacion.map((u) => (
-                      <CircleMarker
-                        key={u.ubicacion_id}
-                        center={[u.latitud, u.longitud]}
-                        radius={8 + Math.min(u.total / 5, 12)}
-                        pathOptions={{
-                          fillColor: getSmogColor(u.pct_smog),
-                          color: '#1E1E1E',
-                          weight: 1,
-                          fillOpacity: 0.8,
-                        }}
-                      >
-                        <Popup>
-                          <strong>{u.nombre || `Ubicación ${u.ubicacion_id}`}</strong>
-                          <br />
-                          Total: {u.total} | Smog: {u.smog} ({u.pct_smog.toFixed(1)}%)
-                        </Popup>
-                      </CircleMarker>
-                    ))}
-                  </MapContainer>
-                </div>
-              ) : (
-                <div className="h-[320px] flex items-center justify-center text-gray-500">
-                  No hay datos de ubicaciones
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* 7. Por usuario */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-vino mb-4">Actividad por usuario</h2>
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={porUsuario}
-                margin={{ bottom: 60 }}
-                layout="vertical"
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="nombre" width={120} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="total_imagenes" fill="#C6B38E" name="Imágenes" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="total_predicciones" fill="#7A1E2B" name="Predicciones" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-
-        {/* 8. Tabla resumen por período */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-vino mb-4">Resumen por período</h2>
-          <div className="bg-white rounded-lg shadow border border-gray-200 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Período</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Predicciones</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Smog</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">% Smog</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Confianza prom.</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">p_smog prom.</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {tablaResumen.map((row) => (
-                  <tr key={row.periodo} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">{row.periodo}</td>
-                    <td className="px-4 py-3 text-sm text-right">{row.total_predicciones}</td>
-                    <td className="px-4 py-3 text-sm text-right">{row.total_smog}</td>
-                    <td className="px-4 py-3 text-sm text-right font-medium" style={{ color: getSmogColor(row.pct_smog) }}>
-                      {row.pct_smog.toFixed(1)}%
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right">{(row.confianza_promedio * 100).toFixed(1)}%</td>
-                    <td className="px-4 py-3 text-sm text-right">{(row.p_smog_promedio * 100).toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {tablaResumen.length === 0 && (
-              <div className="text-center py-8 text-gray-500">No hay datos para el rango seleccionado.</div>
-            )}
-          </div>
-        </section>
-      </div>
+      <div className="space-y-14 pb-10">{sections}</div>
     </div>
   );
 };

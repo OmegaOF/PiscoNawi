@@ -43,6 +43,7 @@ export const navItems: NavItem[] = [
       { path: '/captura', label: 'Captura de Vehículos', roles: ALL_ROLES },
       { path: '/procesar-capturas', label: 'Procesar Capturas (CNN)', roles: ALL_ROLES },
       { path: '/analisis', label: 'Resultados CNN', roles: ALL_ROLES },
+      { path: '/placas', label: 'Registro de placas', roles: ALL_ROLES },
       { path: '/analisis-masivo', label: 'Análisis Masivo', roles: ALL_ROLES },
     ],
   },
@@ -50,7 +51,7 @@ export const navItems: NavItem[] = [
     type: 'group',
     label: 'Reportes',
     children: [
-      { path: '/reportes', label: 'Generar Reportes', roles: [ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
+      { path: '/reportes', label: 'Panel de reportes', roles: [ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
       { path: '/reportes-generados', label: 'Reportes PDF', roles: [ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV] },
     ],
   },

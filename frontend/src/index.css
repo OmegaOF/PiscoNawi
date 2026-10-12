@@ -84,3 +84,49 @@ code {
   opacity: 0;
   animation: fade-in 0.6s ease-out forwards;
 }
+/* ===== Reportes ===== */
+.leaflet-container {
+  z-index: 0;
+  isolation: isolate;
+  font-family: inherit;
+}
+.skeleton {
+  background: linear-gradient(90deg, #eeebe6 25%, #f6f5f2 50%, #eeebe6 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+html[data-presentation] .skeleton {
+  background: linear-gradient(90deg, #2a2023 25%, #34282b 50%, #2a2023 75%);
+  background-size: 800px 100%;
+}
+@keyframes shimmer {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+html[data-presentation] {
+  font-size: 18px;
+}
+html[data-presentation] body {
+  overflow: hidden;
+}
+.chart-card:fullscreen {
+  background: #ffffff;
+  padding: 2rem;
+  overflow: auto;
+}
+html[data-presentation] .chart-card:fullscreen {
+  background: #241B1E;
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+.leaflet-tooltip.zona-label {
+  background: rgba(28, 21, 23, 0.85);
+  color: #F3EDE7;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 2px 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.leaflet-tooltip.zona-label::before { display: none; }

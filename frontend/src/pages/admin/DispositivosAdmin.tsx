@@ -112,7 +112,7 @@ const DispositivosAdmin: React.FC = () => {
             <input className="border rounded px-3 py-2" placeholder="FPS" type="number" value={form.fps || ''} onChange={(e) => setForm({ ...form, fps: Number(e.target.value) || null })} />
             <input className="border rounded px-3 py-2" placeholder="Interfaz" value={form.interfaz || ''} onChange={(e) => setForm({ ...form, interfaz: e.target.value })} />
             <input className="border rounded px-3 py-2" placeholder="Ubicación física" value={form.ubicacion_fisica || ''} onChange={(e) => setForm({ ...form, ubicacion_fisica: e.target.value })} />
-            <input className="border rounded px-3 py-2" placeholder="Fecha instalación (ISO)" value={form.fecha_instalacion || ''} onChange={(e) => setForm({ ...form, fecha_instalacion: e.target.value })} />
+            <input className="border rounded px-3 py-2" placeholder="Fecha de instalación (AAAA-MM-DD)" value={form.fecha_instalacion || ''} onChange={(e) => setForm({ ...form, fecha_instalacion: e.target.value })} />
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.activo} onChange={(e) => setForm({ ...form, activo: e.target.checked })} /> Activo</label>
             <button className="bg-vino text-white rounded px-4 py-2" type="submit">{editing ? 'Guardar cambios' : 'Crear'}</button>
             {editing && <button className="border rounded px-4 py-2" type="button" onClick={() => { setEditing(null); setForm({ nombre_dispositivo: '', activo: true }); }}>Cancelar</button>}
@@ -150,9 +150,9 @@ const DispositivosAdmin: React.FC = () => {
           <div className="grid md:grid-cols-2 gap-6">
             <form onSubmit={addHistorial} className="bg-white border border-gray-200 rounded-lg p-4 space-y-2">
               <h2 className="font-semibold text-vino">Registrar historial dispositivo #{selectedId}</h2>
-              <input className="border rounded px-3 py-2 w-full" placeholder="fecha_inicio ISO" value={historialForm.fecha_inicio} onChange={(e) => setHistorialForm({ ...historialForm, fecha_inicio: e.target.value })} />
-              <input className="border rounded px-3 py-2 w-full" placeholder="fecha_fin ISO" value={historialForm.fecha_fin} onChange={(e) => setHistorialForm({ ...historialForm, fecha_fin: e.target.value })} />
-              <input className="border rounded px-3 py-2 w-full" placeholder="observaciones" value={historialForm.observaciones} onChange={(e) => setHistorialForm({ ...historialForm, observaciones: e.target.value })} />
+              <input className="border rounded px-3 py-2 w-full" placeholder="Fecha de inicio (AAAA-MM-DD)" value={historialForm.fecha_inicio} onChange={(e) => setHistorialForm({ ...historialForm, fecha_inicio: e.target.value })} />
+              <input className="border rounded px-3 py-2 w-full" placeholder="Fecha de fin (AAAA-MM-DD)" value={historialForm.fecha_fin} onChange={(e) => setHistorialForm({ ...historialForm, fecha_fin: e.target.value })} />
+              <input className="border rounded px-3 py-2 w-full" placeholder="Observaciones" value={historialForm.observaciones} onChange={(e) => setHistorialForm({ ...historialForm, observaciones: e.target.value })} />
               <button className="bg-vino text-white rounded px-4 py-2">Guardar historial</button>
             </form>
 
