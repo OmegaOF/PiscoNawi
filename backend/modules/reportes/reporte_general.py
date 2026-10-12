@@ -7,14 +7,14 @@ from sqlalchemy import func
 
 from db import Imagen, Prediccion
 from modules.reportes.reporte_por_zonas import _query_zonas, generar_mapa_zonas_png
-from modules.reportes.reports import fetch_tabla_resumen_data, get_tendencia_predicciones
+from modules.reportes.reports import build_filters, fetch_tabla_resumen_data, fetch_tendencia_data
 from modules.reportes.reporte_cambios_tiempo import generar_grafico_cambios_barras_png
 from modules.reportes.utils_reportes import NO_DATA_MESSAGE, build_page_callbacks, build_styles, caja_conclusion, kpi_cards, observacion_por_pct_smog, portada_simple, safe_pct, tabla_estilizada
 
 
 async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nombre: str, user):
     rows = fetch_tabla_resumen_data(db=db, desde=payload.desde, hasta=payload.hasta, agrupar=payload.agrupar)
-    tendencia = await get_tendencia_predicciones(user=user, db=db, desde=payload.desde, hasta=payload.hasta, agrupar=payload.agrupar)
+    tendencia = fetch_tendencia_data(db, build_filters(payload.desde, payload.hasta), payload.agrupar)
     zonas = _query_zonas(db, payload.desde, payload.hasta)
 
     total_pred = sum(r.total_predicciones for r in rows)

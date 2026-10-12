@@ -11,7 +11,7 @@ from staticmap import CircleMarker, StaticMap
 
 from db import Imagen, Prediccion, Ubicacion
 from modules.reportes.reports import _parse_date
-from modules.reportes.utils_reportes import NO_DATA_MESSAGE, build_page_callbacks, build_styles, caja_conclusion, portada_simple, safe_pct, tabla_estilizada
+from modules.reportes.utils_reportes import NIVEL_COLORES, nivel_smog, NO_DATA_MESSAGE, build_page_callbacks, build_styles, caja_conclusion, portada_simple, safe_pct, tabla_estilizada
 
 
 def _query_zonas(db, desde, hasta):
@@ -51,13 +51,8 @@ def _query_zonas(db, desde, hasta):
 
 
 def _categoria_smog(zona):
-    if zona["smog"] <= 0:
-        return "Sin smog", "#aeb6bf"
-    if zona["pct_smog"] > 60:
-        return "Alto", "#c0392b"
-    if zona["pct_smog"] > 30:
-        return "Moderado", "#f39c12"
-    return "Bajo", "#27ae60"
+    nivel = nivel_smog(zona["pct_smog"], zona["smog"])
+    return nivel, NIVEL_COLORES[nivel]
 
 
 def generar_mapa_zonas_png(zonas):

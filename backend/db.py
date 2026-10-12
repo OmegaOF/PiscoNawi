@@ -12,6 +12,9 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Boolean,
+    Text,
+    inspect,
+    text,
 )
 import os
 from dotenv import load_dotenv
@@ -241,6 +244,7 @@ class ReporteGenerado(Base):
     fecha_generado = Column(DateTime, nullable=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     ruta_archivo = Column(String(255), nullable=False)
+    parametros_json = Column(Text, nullable=True)
 
     usuario = relationship("Usuario", back_populates="reportes_generados")
 def get_db():
@@ -249,3 +253,30 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+
+# --- Migraciones mínimas: create_all no altera tablas existentes ---
+SCHEMA_UPGRADES = [
+    (
+        "reportes_generados",
+        "parametros_json",
+        "ALTER TABLE reportes_generados ADD COLUMN parametros_json TEXT NULL",
+    ),
+]
+
+
+def ensure_schema_upgrades(bind) -> list:
+    """Agrega columnas nuevas a tablas existentes. Idempotente."""
+    applied = []
+    insp = inspect(bind)
+    tables = set(insp.get_table_names())
+    for table, column, ddl in SCHEMA_UPGRADES:
+        if table not in tables:
+            continue
+        if column in {c["name"] for c in insp.get_columns(table)}:
+            continue
+        with bind.begin() as conn:
+            conn.execute(text(ddl))
+        applied.append(f"{table}.{column}")
+    return applied

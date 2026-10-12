@@ -77,7 +77,7 @@ async def crear_usuario(
 ):
     exists = db.query(Usuario).filter(Usuario.username == payload.username).first()
     if exists:
-        raise HTTPException(status_code=400, detail="El username ya existe")
+        raise HTTPException(status_code=400, detail="El nombre de usuario ya existe")
 
     nuevo = Usuario(
         nombre=payload.nombre,
@@ -110,7 +110,7 @@ async def actualizar_usuario(
     if payload.username and payload.username != target.username:
         exists = db.query(Usuario).filter(Usuario.username == payload.username).first()
         if exists:
-            raise HTTPException(status_code=400, detail="El username ya existe")
+            raise HTTPException(status_code=400, detail="El nombre de usuario ya existe")
 
     if payload.nombre is not None:
         target.nombre = payload.nombre

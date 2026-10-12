@@ -10,7 +10,7 @@ import numpy as np
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer
 
-from modules.reportes.reports import get_tendencia_predicciones
+from modules.reportes.reports import build_filters, fetch_tendencia_data
 from modules.reportes.utils_reportes import NO_DATA_MESSAGE, build_page_callbacks, build_styles, caja_conclusion, portada_simple, safe_pct, tabla_estilizada
 
 
@@ -45,7 +45,7 @@ def generar_grafico_cambios_barras_png(rows):
 
 
 async def generar_reporte_cambios_tiempo_pdf(file_path: Path, db, payload, usuario_nombre: str, user):
-    rows = await get_tendencia_predicciones(user=user, db=db, desde=payload.desde, hasta=payload.hasta, agrupar=payload.agrupar)
+    rows = fetch_tendencia_data(db, build_filters(payload.desde, payload.hasta), payload.agrupar)
     styles = build_styles()
     story = []
     portada_simple(story, styles, "Reporte de Cambios en el Tiempo", usuario_nombre, payload.desde, payload.hasta, payload.agrupar)

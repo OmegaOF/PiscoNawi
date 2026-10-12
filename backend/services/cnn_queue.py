@@ -171,7 +171,7 @@ def _worker(
                 clase_predicha=result["clase_predicha"],
                 confianza=float(result["confianza"]),
                 p_smog=float(result["p_smog"]),
-                fecha_prediccion=datetime.utcnow(),
+                fecha_prediccion=datetime.now(),  # hora local, igual que fecha_subida y NOW() de MySQL
                 observacion=""
             )
             db.add(pred)

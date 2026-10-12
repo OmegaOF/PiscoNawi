@@ -5,26 +5,29 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import os
 
-from db import engine, Base, get_db
+from db import engine, Base, get_db, ensure_schema_upgrades
 from modules.auth.auth import authenticate_user, create_access_token, Token, UserLogin, get_current_user
 from modules.captura.captura import router as captura_router
 from modules.analisis.analisis import router as analisis_router
 from modules.reportes.reports import router as reports_router
+from modules.reportes.reports_extra import router as reports_extra_router
 from modules.catalogos.catalogos import router as catalogos_router
 from modules.dispositivos.dispositivos import router as dispositivos_router
-from modules.catalogos.catalogos import router as catalogos_router
 from modules.reportes.operator_reviews import router as operator_reviews_router
-from modules.dispositivos.dispositivos import router as dispositivos_router
 from modules.roles.roles import router as roles_router
 from modules.roles.roles import get_user_roles
 from modules.usuarios.usuarios import router as usuarios_router
 from modules.configuraciones.configuraciones import router as configuraciones_router
 from modules.reportes.reportes_generados import router as reportes_generados_router
+from modules.placas.placas import router as placas_router
 # Test database connection and create tables if needed
 try:
     with engine.connect() as conn:
         print("Database connection successful!")
     Base.metadata.create_all(bind=engine)
+    applied = ensure_schema_upgrades(engine)
+    if applied:
+        print(f"Schema upgrades applied: {applied}")
     print("Database tables ready!")
 except Exception as e:
     print(f"Database connection failed: {e}")
@@ -53,12 +56,14 @@ app.include_router(operator_reviews_router, prefix="/api/operator", tags=["opera
 app.include_router(captura_router, prefix="/api/captura", tags=["captura"])
 app.include_router(analisis_router, prefix="/api/analisis", tags=["analisis"])
 app.include_router(reports_router, prefix="/api/reports", tags=["reports"])
+app.include_router(reports_extra_router, prefix="/api/reports", tags=["reports"])
 app.include_router(catalogos_router, prefix="/api/catalogos", tags=["catalogos"])
 app.include_router(dispositivos_router, prefix="/api/dispositivos", tags=["dispositivos"])
 app.include_router(roles_router, prefix="/api/roles", tags=["roles"])
 app.include_router(usuarios_router, prefix="/api/usuarios", tags=["usuarios"])
 app.include_router(configuraciones_router, prefix="/api/configuraciones", tags=["configuraciones"])
 app.include_router(reportes_generados_router, prefix="/api/reportes-generados", tags=["reportes-generados"])
+app.include_router(placas_router, prefix="/api/placas", tags=["placas"])
 
 
 @app.post("/api/auth/login", response_model=Token)
