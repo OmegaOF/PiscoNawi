@@ -3,7 +3,50 @@ import base64
 import json
 import os
 from typing import Dict, Any
-from .config import CNN_MODEL_STEP_INFO, CNN_MODEL_STEP_URL, CNN_MODEL_STEP_VERSION
+from .config import (
+    CNN_MODEL_STEP_INFO,
+    CNN_MODEL_STEP_MAX_TOKENS,
+    CNN_MODEL_STEP_REASONING,
+    CNN_MODEL_STEP_URL,
+    CNN_MODEL_STEP_VERSION,
+)
+
+ESFUERZOS_VALIDOS = {"minimal", "low", "medium", "high"}
+
+
+def es_modelo_razonamiento(modelo: str) -> bool:
+    """gpt-5.x y la serie o (o1, o3, o4) usan otra forma de petición que gpt-4o / gpt-4.1."""
+    m = (modelo or "").lower()
+    return m.startswith("gpt-5") or m.startswith(("o1", "o3", "o4"))
+
+
+def construir_payload(modelo: str, prompt: str, base64_image: str,
+                      max_tokens=None, esfuerzo=None) -> Dict[str, Any]:
+    """Arma la petición según la familia del modelo indicado en CNN_MODEL_STEP_VERSION."""
+    mensajes = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
+            ],
+        }
+    ]
+    if not es_modelo_razonamiento(modelo):
+        # gpt-4o / gpt-4.1: petición original, sin cambios
+        return {"model": modelo, "messages": mensajes, "max_tokens": int(max_tokens or 500)}
+
+    # gpt-5.x / o-series: max_completion_tokens incluye los tokens de razonamiento
+    payload = {
+        "model": modelo,
+        "messages": mensajes,
+        "max_completion_tokens": int(max_tokens or 4000),
+        "response_format": {"type": "json_object"},
+    }
+    esfuerzo = (esfuerzo or "low").lower()
+    if esfuerzo in ESFUERZOS_VALIDOS and "chat" not in modelo.lower():
+        payload["reasoning_effort"] = esfuerzo
+    return payload
 
 async def analizar_imagen_cnn_model_step(ruta_archivo: str) -> Dict[str, Any]:
     """
@@ -81,29 +124,16 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
         "Authorization": f"Bearer {CNN_MODEL_STEP_INFO}"
     }
 
-    payload = {
-        "model": CNN_MODEL_STEP_VERSION,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": prompt
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_image}"
-                        }
-                    }
-                ]
-            }
-        ],
-        "max_tokens": 500
-    }
+    payload = construir_payload(
+        CNN_MODEL_STEP_VERSION,
+        prompt,
+        base64_image,
+        max_tokens=CNN_MODEL_STEP_MAX_TOKENS,
+        esfuerzo=CNN_MODEL_STEP_REASONING,
+    )
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    timeout = 120.0 if es_modelo_razonamiento(CNN_MODEL_STEP_VERSION) else 60.0
+    async with httpx.AsyncClient(timeout=timeout) as client:
         try:
             response = await client.post(CNN_MODEL_STEP_URL, headers=headers, json=payload)
         except httpx.RequestError as e:
@@ -117,6 +147,15 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
             result = response.json()
         except json.JSONDecodeError as e:
             raise Exception(f"Respuesta inválida del servicio de análisis: {str(e)}")
+
+        # Registrar consumo real de tokens (útil para medir costo por imagen)
+        uso = result.get("usage") or {}
+        razonamiento = (uso.get("completion_tokens_details") or {}).get("reasoning_tokens", 0)
+        print(
+            f"[modelo] {result.get('model', CNN_MODEL_STEP_VERSION)} tokens: entrada={uso.get('prompt_tokens')} "
+            f"salida={uso.get('completion_tokens')} (razonamiento={razonamiento}) "
+            f"finish={((result.get('choices') or [{}])[0]).get('finish_reason')}"
+        )
 
         # Extraer el contenido JSON de la respuesta
         if not result.get("choices") or len(result["choices"]) == 0:
