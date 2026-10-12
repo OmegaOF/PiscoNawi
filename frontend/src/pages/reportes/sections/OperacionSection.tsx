@@ -34,7 +34,8 @@ const OperacionSection: React.FC<SectionProps> = ({ data }) => {
           minHeight={260}
         >
           <EChart option={rankingBarOption(conDatos.map(dispToRank), ctx)} height={Math.max(200, conDatos.length * 48)} ariaLabel="Smog por dispositivo" />
-          <table className="mt-3 min-w-full text-sm">
+          <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full whitespace-nowrap text-sm">
             <thead>
               <tr className={cx('text-left text-xs uppercase tracking-wide', s.muted)}>
                 <th className="py-1.5 font-medium">Dispositivo</th>
@@ -61,6 +62,7 @@ const OperacionSection: React.FC<SectionProps> = ({ data }) => {
               ))}
             </tbody>
           </table>
+          </div>
         </ChartCard>
 
         <ChartCard

@@ -130,3 +130,10 @@ html[data-presentation] .chart-card:fullscreen {
   box-shadow: 0 2px 8px rgba(0,0,0,.25);
 }
 .leaflet-tooltip.zona-label::before { display: none; }
+
+/* ===== Responsive ===== */
+/* Los hijos de grid no deben estirarse más allá de su columna por contenido ancho
+   (gráficos, tablas, selects con opciones largas). */
+.grid > * {
+  min-width: 0;
+}

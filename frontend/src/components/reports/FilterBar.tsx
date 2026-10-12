@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowPathIcon, DocumentArrowDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, ChevronDownIcon, DocumentArrowDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { Agrupar, DispositivoCatalogo, ReportFilters, ZonaItem } from '../../lib/reportsApi';
 import { Preset, PRESETS } from '../../hooks/useReportFilters';
 import { etiquetaZona } from '../../lib/smog';
@@ -22,11 +22,25 @@ interface FilterBarProps {
 
 const inputCls = 'h-9 rounded-lg border border-neutral-border bg-white px-2.5 text-sm text-text-dark focus:border-rojo-tinto focus:outline-none focus:ring-2 focus:ring-rojo-tinto/20';
 
-const FilterBar: React.FC<FilterBarProps> = ({ filters, preset, onPreset, onChange, zonas, dispositivos, loading, onReload, exportHref }) => (
-  <div className="sticky top-20 z-30 -mx-4 mb-6 border-b border-neutral-border/70 bg-neutral-bg/85 px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border sm:shadow-sm">
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+const FilterBar: React.FC<FilterBarProps> = ({ filters, preset, onPreset, onChange, zonas, dispositivos, loading, onReload, exportHref }) => {
+  const [abierto, setAbierto] = useState(false);
+  const etiqueta = PRESETS.find((p) => p.id === preset)?.label || (filters.desde || filters.hasta ? 'Rango personalizado' : 'Todo');
+  return (
+  <div className="-mx-4 mb-6 border-b border-neutral-border/70 bg-neutral-bg/85 px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border sm:shadow-sm lg:sticky lg:top-20 lg:z-30">
+    <button
+      type="button"
+      onClick={() => setAbierto((v) => !v)}
+      aria-expanded={abierto}
+      className="flex w-full items-center justify-between gap-2 text-sm font-medium text-text-dark lg:hidden"
+    >
+      <span className="flex items-center gap-2">
+        <FunnelIcon className="h-4 w-4 text-text-muted" /> Filtros · <span className="text-rojo-tinto">{etiqueta}</span>
+      </span>
+      <ChevronDownIcon className={cx('h-4 w-4 transition-transform', abierto && 'rotate-180')} />
+    </button>
+    <div className={cx('flex-wrap items-center gap-x-4 gap-y-3 lg:flex', abierto ? 'mt-3 flex' : 'hidden')}>
       <div className="flex items-center gap-2">
-        <FunnelIcon className="h-4 w-4 text-text-muted" aria-hidden />
+        <FunnelIcon className="hidden h-4 w-4 text-text-muted lg:block" aria-hidden />
         <div className="flex flex-wrap gap-1" role="group" aria-label="Rango rápido">
           {PRESETS.map((p) => (
             <button
@@ -91,7 +105,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, preset, onPreset, onChan
         ))}
       </select>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
         <button
           type="button"
           onClick={onReload}
@@ -111,6 +125,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, preset, onPreset, onChan
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export default FilterBar;

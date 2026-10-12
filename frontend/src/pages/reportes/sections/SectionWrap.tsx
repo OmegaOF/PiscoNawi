@@ -20,7 +20,7 @@ const SectionWrap: React.FC<SectionWrapProps> = ({ id, subtitle, right, children
       id={id}
       data-section={id}
       className={cx(
-        active ? 'mx-auto flex min-h-screen w-full max-w-[1500px] snap-start flex-col justify-center px-6 py-16 lg:px-12' : 'scroll-mt-44',
+        active ? 'mx-auto flex min-h-screen w-full max-w-[1500px] snap-start flex-col justify-center px-6 py-16 lg:px-12' : 'scroll-mt-24 lg:scroll-mt-56',
       )}
       initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}

@@ -58,11 +58,11 @@ const GaleriaSection: React.FC<SectionProps> = ({ data }) => {
                 <span className="absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold text-white shadow" style={{ background: color }}>
                   #{i + 1}
                 </span>
-                <div className="absolute inset-x-0 bottom-0 p-3 text-white">
-                  <p className="text-2xl font-extrabold leading-none" style={{ color }}>
+                <div className="absolute inset-x-0 bottom-0 p-2 text-white sm:p-3">
+                  <p className="text-lg font-extrabold leading-none sm:text-2xl" style={{ color }}>
                     {fmtPct01(it.p_smog, 0)}
                   </p>
-                  <p className="mt-1 font-mono text-xs font-semibold tracking-wider">{it.placa_manual || 'Sin placa'}</p>
+                  <p className="mt-1 font-mono text-[11px] font-semibold tracking-wider sm:text-xs">{it.placa_manual || 'Sin placa'}</p>
                   <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-white/80">
                     <MapPinIcon className="h-3 w-3 shrink-0" />
                     {it.ubicacion_nombre || '—'} · {fmtDateTime(it.fecha_prediccion)}

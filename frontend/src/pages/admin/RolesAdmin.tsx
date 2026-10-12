@@ -72,11 +72,11 @@ const RolesAdmin: React.FC = () => {
         <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
           <h2 className="font-semibold text-vino mb-3">Asignar rol a usuario</h2>
           <form onSubmit={submit} className="grid md:grid-cols-4 gap-3">
-            <select className="border rounded px-3 py-2" value={usuarioId} onChange={(e) => setUsuarioId(Number(e.target.value) || '')} required>
+            <select className="w-full min-w-0 border rounded px-3 py-2" value={usuarioId} onChange={(e) => setUsuarioId(Number(e.target.value) || '')} required>
               <option value="">Seleccione usuario</option>
               {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nombre} ({u.username})</option>)}
             </select>
-            <select className="border rounded px-3 py-2" value={rolId} onChange={(e) => setRolId(Number(e.target.value) || '')} required>
+            <select className="w-full min-w-0 border rounded px-3 py-2" value={rolId} onChange={(e) => setRolId(Number(e.target.value) || '')} required>
               <option value="">Seleccione rol</option>
               {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
             </select>

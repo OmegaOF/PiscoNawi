@@ -79,8 +79,8 @@ const ChartCard: React.FC<ChartCardProps> = ({
 
   return (
     <div ref={ref} className={cx('chart-card rounded-2xl border shadow-sm', s.card, className)}>
-      <div className="flex items-start justify-between gap-3 px-5 pt-4">
-        <div className="flex min-w-0 items-start gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 px-4 pt-4 sm:px-5">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           {Icon && (
             <span className={cx('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', s.chip)}>
               <Icon className="h-4 w-4" />
@@ -91,8 +91,7 @@ const ChartCard: React.FC<ChartCardProps> = ({
             {subtitle && <p className={cx('mt-0.5 text-xs', s.muted)}>{subtitle}</p>}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {actions}
+        <div className="flex shrink-0 items-center gap-1 sm:order-last">
           {help && <HelpPopover>{help}</HelpPopover>}
           {allowFullscreen && (
             <button
@@ -106,8 +105,9 @@ const ChartCard: React.FC<ChartCardProps> = ({
             </button>
           )}
         </div>
+        {actions && <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">{actions}</div>}
       </div>
-      <div className={cx('px-5 pb-5 pt-3', bodyClassName)}>{body}</div>
+      <div className={cx('px-4 pb-4 pt-3 sm:px-5 sm:pb-5', bodyClassName)}>{body}</div>
     </div>
   );
 };

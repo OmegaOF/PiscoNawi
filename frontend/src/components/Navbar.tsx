@@ -67,17 +67,17 @@ const Navbar: React.FC = () => {
         <div className="flex justify-between items-center min-h-20 py-3">
           {/* Logo */}
           <div className="flex items-center min-w-0 flex-1">
-            <div className="flex-shrink-0 flex items-center">
+            <div className="flex min-w-0 items-center lg:flex-shrink-0">
               <img
                 src="/vermilion-2.png"
                 alt="Logotipo de Pisco Ñawi IA"
                 className="w-8 h-8 mr-3"
               />
-              <h1 className="text-xl font-bold">PISCONAWI IA</h1>
+              <h1 className="truncate text-lg font-bold sm:text-xl">PISCONAWI IA</h1>
             </div>
 
             {/* Desktop navigation */}
-            <div className="hidden md:block ml-8 min-w-0 flex-1">
+            <div className="hidden lg:block ml-8 min-w-0 flex-1">
               <div className="flex items-center gap-1">
                 {navItems.map((item, index) => {
                   if (item.type === 'link') {
@@ -117,20 +117,20 @@ const Navbar: React.FC = () => {
           </div>
 
           {/* Right side: user info + logout + hamburger */}
-          <div className="flex items-center space-x-4">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
             {user && (
-              <span className="hidden sm:inline text-sm">
+              <span className="hidden xl:inline text-sm">
                 Bienvenido, {user.nombre}
               </span>
             )}
             <button
               onClick={logout}
-              className="bg-neutral-bg text-rojo-tinto px-4 py-2 rounded-md text-sm font-medium hover:bg-opacity-80 transition-colors duration-200"
+              className="hidden sm:inline-flex bg-neutral-bg text-rojo-tinto px-4 py-2 rounded-md text-sm font-medium hover:bg-opacity-80 transition-colors duration-200"
             >
               Cerrar Sesión
             </button>
             <button
-              className="md:hidden p-2 rounded-md hover:bg-white/20 transition-colors"
+              className="lg:hidden p-2 rounded-md hover:bg-white/20 transition-colors"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
               aria-label="Abrir o cerrar el menú de navegación"
             >
@@ -148,7 +148,7 @@ const Navbar: React.FC = () => {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            className="md:hidden bg-rojo-tinto border-t border-neutral-bg"
+            className="lg:hidden bg-rojo-tinto border-t border-neutral-bg"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -185,6 +185,15 @@ const Navbar: React.FC = () => {
                   />
                 );
               })}
+              <div className="mt-2 border-t border-white/20 pt-3 sm:hidden">
+                {user && <p className="px-3 pb-2 text-sm text-white/80">Bienvenido, {user.nombre}</p>}
+                <button
+                  onClick={logout}
+                  className="w-full rounded-md bg-neutral-bg px-3 py-2 text-left text-base font-medium text-rojo-tinto"
+                >
+                  Cerrar Sesión
+                </button>
+              </div>
             </div>
           </motion.div>
         )}

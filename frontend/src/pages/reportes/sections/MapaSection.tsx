@@ -22,7 +22,7 @@ const MapaSection: React.FC<SectionProps> = ({ data }) => {
   const [selected, setSelected] = useState<number | null>(null);
   const zonas = data.zonas.data || [];
   const ranking = zonas.map(zonaToRank).sort((a, b) => b.pct - a.pct);
-  const height = active ? '62vh' : 560;
+  const height = active ? '62vh' : '100%';
 
   return (
     <SectionWrap id="mapa" subtitle="Dónde se concentra el smog en el área metropolitana de Cochabamba">
@@ -38,7 +38,7 @@ const MapaSection: React.FC<SectionProps> = ({ data }) => {
           onRetry={data.zonas.reload}
           empty={!!data.zonas.data && zonas.length === 0}
           emptyText="No hay ubicaciones con predicciones en este rango."
-          minHeight={typeof height === 'number' ? height : 420}
+          minHeight={320}
           actions={
             <div className="hidden items-center gap-3 pr-2 sm:flex">
               {LEYENDA.map((n) => (
@@ -50,7 +50,9 @@ const MapaSection: React.FC<SectionProps> = ({ data }) => {
             </div>
           }
         >
-          <SmogMap zonas={zonas} height={height} dark={ctx.dark} permanentLabels={active} selectedId={selected} />
+          <div className={active ? '' : 'h-[320px] sm:h-[440px] lg:h-[560px]'}>
+            <SmogMap zonas={zonas} height={height} dark={ctx.dark} permanentLabels={active} selectedId={selected} />
+          </div>
         </ChartCard>
 
         <ChartCard

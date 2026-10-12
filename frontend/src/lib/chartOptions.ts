@@ -250,7 +250,7 @@ export function rankingBarOption(items: RankItem[], ctx: ChartCtx): EChartsOptio
       },
     },
     grid: { left: 8, right: 56, top: 8, bottom: 8, containLabel: true },
-    xAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%', fontSize: ctx.fs(10) } },
+    xAxis: { type: 'value', max: 100, splitNumber: 4, axisLabel: { formatter: '{value}%', fontSize: ctx.fs(10), hideOverlap: true } },
     yAxis: {
       type: 'category',
       inverse: true,
@@ -398,7 +398,7 @@ export function operatorsOption(users: UsuarioItem[], ctx: ChartCtx): EChartsOpt
     },
     legend: { top: 0, left: 0 },
     grid: { left: 8, right: 56, top: 36, bottom: 8, containLabel: true },
-    xAxis: { type: 'value', minInterval: 1 },
+    xAxis: { type: 'value', minInterval: 1, splitNumber: 3, axisLabel: { hideOverlap: true } },
     yAxis: { type: 'category', inverse: true, data: rows.map((u) => u.nombre), axisLabel: { color: ctx.text, width: 160, overflow: 'truncate' }, axisLine: { show: false } },
     series: [
       { name: 'Con smog', type: 'bar', stack: 'u', barMaxWidth: 22, itemStyle: { color: ctx.cls.smog, borderColor: ctx.surface, borderWidth: 1 }, data: rows.map((u) => u.smog ?? 0) },

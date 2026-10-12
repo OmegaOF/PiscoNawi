@@ -98,7 +98,7 @@ const HistoryList: React.FC<Props> = ({ items, loading, canDelete, highlightId, 
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-vino/10 text-vino">
                     <Icon className="h-5 w-5" />
                   </span>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 basis-[calc(100%-3.25rem)] sm:basis-0">
                     <p className="truncate font-medium text-text-dark">
                       {meta?.titulo || r.tipo_reporte_label || r.nombre_reporte} <span className="text-text-muted">#{r.id}</span>
                     </p>
@@ -121,13 +121,13 @@ const HistoryList: React.FC<Props> = ({ items, loading, canDelete, highlightId, 
                   </div>
                   <span
                     className={cx(
-                      'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                      'ml-[3.25rem] rounded-full px-2 py-0.5 text-[11px] font-semibold sm:ml-0',
                       disponible ? 'bg-smog-bajo/15 text-smog-bajo' : 'bg-smog-moderado/15 text-[#A86E00]',
                     )}
                   >
                     {disponible ? 'Disponible' : 'Archivo faltante'}
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="ml-auto flex items-center gap-1">
                     <button
                       onClick={() => onPreview(r)}
                       disabled={!disponible}

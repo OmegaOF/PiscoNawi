@@ -151,21 +151,21 @@ const ReportesGenerados: React.FC = () => {
         </Link>
       </header>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3">
         {statCards.map((c, i) => (
           <motion.div
             key={c.label}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.08 }}
-            className="flex items-center gap-3 rounded-2xl border border-neutral-border bg-white p-4 shadow-sm"
+            className="flex flex-col items-start gap-2 rounded-2xl border border-neutral-border bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:gap-3 sm:p-4"
           >
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-vino/10 text-vino">
               <c.icon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wide text-text-muted">{c.label}</p>
-              <p className="truncate text-lg font-bold text-text-dark">{c.value}</p>
+              <p className="text-[10px] uppercase leading-tight tracking-wide text-text-muted sm:text-xs">{c.label}</p>
+              <p className="text-sm font-bold leading-tight text-text-dark sm:truncate sm:text-lg">{c.value}</p>
             </div>
           </motion.div>
         ))}
