@@ -37,15 +37,20 @@ def _get_all_images_fifo():
     return files
 
 
-def _image_has_prediction(db: Session, image_path: str) -> bool:
-    """
-    ✅ Se revisa por filename_original (no por ruta), porque ahora ruta_archivo será una URL.
-    """
+def _buscar_imagen(db: Session, image_path: str) -> Optional[Imagen]:
+    """Busca la fila de esta imagen igual que _ensure_image_row: por URL pública o por nombre."""
     filename = os.path.basename(image_path)
-    img = db.query(Imagen).filter(Imagen.filename_original == filename).first()
-    if not img:
-        return False
-    return img.prediccion is not None
+    public_url = f"{PUBLIC_BASE_URL}/{filename}"
+    return (
+        db.query(Imagen).filter(Imagen.ruta_archivo == public_url).first()
+        or db.query(Imagen).filter(Imagen.filename_original == filename).first()
+    )
+
+
+def _image_has_prediction(db: Session, image_path: str) -> bool:
+    """True si la fila que se reutilizaría ya tiene predicción (solo se permite una por imagen)."""
+    img = _buscar_imagen(db, image_path)
+    return img is not None and img.prediccion is not None
 
 def _ensure_image_row(
     db: Session,
@@ -153,44 +158,55 @@ def _worker(
             with _lock:
                 current_file = filename
 
-            # 1) asegurar fila en imagenes (guardando URL pública y opcional ubicación)
-            logger.debug("procesamiento en curso")
-            img_row = _ensure_image_row(
-                db,
-                image_path,
-                ubicacion_id=ubicacion_id,
-                user_id=user_id,
-                dispositivo_id=dispositivo_id,
-            )
+            # Un fallo en una imagen no debe detener el resto de la cola
+            try:
+                # 1) asegurar fila en imagenes (guardando URL pública y opcional ubicación)
+                logger.debug("procesamiento en curso")
+                img_row = _ensure_image_row(
+                    db,
+                    image_path,
+                    ubicacion_id=ubicacion_id,
+                    user_id=user_id,
+                    dispositivo_id=dispositivo_id,
+                )
 
-            # 2) correr CNN usando la RUTA LOCAL REAL (no URL)
-            result = predict_smog(image_path)
+                # La fila reutilizada puede tener ya una predicción (solo se admite una por imagen)
+                if img_row.prediccion is not None:
+                    logger.debug("imagen ya analizada, se omite: %s", filename)
+                else:
+                    # 2) correr CNN usando la RUTA LOCAL REAL (no URL)
+                    result = predict_smog(image_path)
 
-            # 3) guardar predicción (1-1)
-            pred = Prediccion(
-                imagen_id=img_row.id,
-                clase_predicha=result["clase_predicha"],
-                confianza=float(result["confianza"]),
-                p_smog=float(result["p_smog"]),
-                fecha_prediccion=datetime.now(),  # hora local, igual que fecha_subida y NOW() de MySQL
-                observacion=""
-            )
-            db.add(pred)
-            db.commit()
+                    # 3) guardar predicción (1-1)
+                    pred = Prediccion(
+                        imagen_id=img_row.id,
+                        clase_predicha=result["clase_predicha"],
+                        confianza=float(result["confianza"]),
+                        p_smog=float(result["p_smog"]),
+                        fecha_prediccion=datetime.now(),  # hora local, igual que fecha_subida y NOW() de MySQL
+                        observacion=""
+                    )
+                    db.add(pred)
+                    db.commit()
 
-            with _lock:
-                processed_count += 1
-                pending_count -= 1
+                with _lock:
+                    processed_count += 1
+                    pending_count -= 1
+            except Exception:
+                db.rollback()
+                logger.debug("no se pudo analizar la imagen: %s", filename, exc_info=True)
+                with _lock:
+                    pending_count -= 1
 
             time.sleep(0.2)
 
         # ✅ After CNN processing completes, automatically run additional last analysis of results
         _run_post_processing_analysis(db)
 
-    except Exception as e:
+    except Exception:
         if db:
             db.rollback()
-        logger.debug("no se pudo completar el análisis de una imagen")
+        logger.debug("no se pudo completar el procesamiento", exc_info=True)
     finally:
         if db:
             db.close()
