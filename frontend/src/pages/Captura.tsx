@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ArrowDownTrayIcon, ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import api from '../lib/api';
 
 interface CapturedImage {
@@ -18,6 +19,7 @@ const Captura: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [preview, setPreview] = useState<number | null>(null);
 
   useEffect(() => {
     checkStatus();
@@ -93,6 +95,37 @@ const Captura: React.FC = () => {
     });
   };
 
+  const actual = preview != null ? images[preview] : null;
+
+  const mover = useCallback(
+    (paso: number) => {
+      setPreview((i) => (i == null || images.length === 0 ? i : (i + paso + images.length) % images.length));
+    },
+    [images.length],
+  );
+
+  // Teclado en la vista previa: Esc cierra, flechas navegan
+  useEffect(() => {
+    if (preview == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPreview(null);
+      else if (e.key === 'ArrowRight') mover(1);
+      else if (e.key === 'ArrowLeft') mover(-1);
+    };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [preview, mover]);
+
+  // Si la lista cambia (p. ej. al eliminar), mantener la vista previa dentro de rango
+  useEffect(() => {
+    setPreview((i) => (i == null ? i : images.length === 0 ? null : Math.min(i, images.length - 1)));
+  }, [images.length]);
+
   const handleDeleteImage = async (filename: string) => {
     try {
       await api.delete(`/captura/eliminar/${filename}`);
@@ -164,17 +197,28 @@ const Captura: React.FC = () => {
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {images.map((image) => (
+              {images.map((image, index) => (
                 <div key={image.filename} className="border border-gray-200 rounded-lg overflow-hidden">
                   <div className="aspect-w-4 aspect-h-3 bg-gray-100 relative group">
-                    <img
-                      src={image.url}
-                      alt={image.filename}
-                      className="w-full h-48 object-cover"
-                      loading="lazy"
-                    />
                     <button
-                      onClick={() => handleDeleteImage(image.filename)}
+                      type="button"
+                      onClick={() => setPreview(index)}
+                      className="block w-full focus:outline-none focus:ring-2 focus:ring-rojo-tinto"
+                      title="Ver imagen en grande"
+                      aria-label={`Ver ${image.filename} en grande`}
+                    >
+                      <img
+                        src={image.url}
+                        alt={image.filename}
+                        className="w-full h-48 cursor-zoom-in object-cover transition-transform duration-200 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteImage(image.filename);
+                      }}
                       className="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-700"
                       title="Eliminar imagen"
                     >
@@ -191,6 +235,78 @@ const Captura: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Vista previa de la imagen */}
+      {actual && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+          onMouseDown={(e) => e.target === e.currentTarget && setPreview(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Vista previa de la captura"
+        >
+          <button
+            onClick={() => setPreview(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            aria-label="Cerrar vista previa"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={() => mover(-1)}
+                className="absolute left-4 rounded-full bg-white/10 p-3 text-white hover:bg-white/20"
+                aria-label="Imagen anterior"
+              >
+                <ChevronLeftIcon className="h-6 w-6" />
+              </button>
+              <button
+                onClick={() => mover(1)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white hover:bg-white/20"
+                aria-label="Imagen siguiente"
+              >
+                <ChevronRightIcon className="h-6 w-6" />
+              </button>
+            </>
+          )}
+          <div className="flex max-h-full w-full max-w-5xl flex-col items-center gap-3">
+            <img
+              src={actual.url}
+              alt={actual.filename}
+              className="max-h-[75vh] w-auto max-w-full rounded-lg object-contain shadow-2xl"
+            />
+            <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg bg-white/10 px-4 py-3 text-white backdrop-blur">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{actual.filename}</p>
+                <p className="text-sm text-white/70">
+                  {formatTimestamp(actual.timestamp)}
+                  {images.length > 1 && ` · ${(preview ?? 0) + 1} de ${images.length}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={actual.url}
+                  download={actual.filename}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-2 text-sm font-medium hover:bg-white/25"
+                >
+                  <ArrowDownTrayIcon className="h-4 w-4" /> Descargar
+                </a>
+                <button
+                  onClick={() => {
+                    const nombre = actual.filename;
+                    setPreview(null);
+                    handleDeleteImage(nombre);
+                  }}
+                  className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium hover:bg-red-700"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
