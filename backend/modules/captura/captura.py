@@ -41,12 +41,44 @@ class ProcessOutput(BaseModel):
     stdout: str = ""
     stderr: str = ""
 
+VERDE = (0, 255, 0)
+
+
+def _dibujar_marca(frame, x1: int, y1: int, x2: int, etiqueta: str) -> None:
+    """Dibuja una línea sobre el techo del vehículo y la etiqueta encima de la línea."""
+    alto, ancho = frame.shape[:2]
+    esc = max(1.0, ancho / 640)
+    grosor = max(2, int(round(2 * esc)))
+    escala_texto = 0.6 * esc
+    grosor_texto = max(1, int(round(1.6 * esc)))
+    margen = max(4, int(round(4 * esc)))
+
+    x1 = max(0, min(x1, ancho - 1))
+    x2 = max(0, min(x2, ancho - 1))
+    y1 = max(0, min(y1, alto - 1))
+    cv2.line(frame, (x1, y1), (x2, y1), VERDE, grosor, cv2.LINE_AA)
+
+    (tw, th), base = cv2.getTextSize(etiqueta, cv2.FONT_HERSHEY_SIMPLEX, escala_texto, grosor_texto)
+    caja_alto = th + base + 2 * margen
+    arriba = y1 - grosor // 2 - caja_alto
+    if arriba < 0:  # sin espacio sobre la línea: la etiqueta va debajo
+        arriba = y1 + grosor // 2
+    arriba = max(0, min(arriba, alto - caja_alto))
+    izq = max(0, min(x1, ancho - (tw + 2 * margen)))
+
+    cv2.rectangle(frame, (izq, arriba), (izq + tw + 2 * margen, arriba + caja_alto), VERDE, -1)
+    cv2.putText(frame, etiqueta, (izq + margen, arriba + margen + th),
+                cv2.FONT_HERSHEY_SIMPLEX, escala_texto, (255, 255, 255), grosor_texto, cv2.LINE_AA)
+
+
 def camera_capture_loop():
     """Camera capture loop with YOLO vehicle detection running in a separate thread"""
     global camera_active, model
 
     logger.debug("Iniciando captura")
     cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
     if not cap.isOpened():
         logger.warning("No se pudo abrir la cámara")
@@ -79,16 +111,14 @@ def camera_capture_loop():
                     detected = True
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
 
-                    # Draw bounding box and label on frame
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0,255,0), 2)
-                    cv2.putText(frame, label, (x1, y1-10),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
+                    # Marca: línea sobre el vehículo y etiqueta encima
+                    _dibujar_marca(frame, x1, y1, x2, label)
 
         # Save image if vehicle detected and cooldown period passed
         now = time.time()
         if detected and now - last_capture > COOLDOWN:
             filename = f"{CAPTURA_DIR}/vehicle_{int(now)}.jpg"
-            cv2.imwrite(filename, frame)
+            cv2.imwrite(filename, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
             logger.debug("Vehículo detectado: %s", filename)
             last_capture = now
 
