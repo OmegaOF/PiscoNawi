@@ -22,8 +22,8 @@ Uso (desde la carpeta backend/, con el entorno virtual activo):
     python seed_prueba.py --cantidad 1200 --meses 6 --semilla 3
     python seed_prueba.py --limpiar       # borra los registros de prueba y demo
 
-Marcas para identificar/borrar los registros:
-    imagenes.filename_original LIKE 'prueba_%'   y   predicciones.observacion = 'PRUEBA'
+Marca para identificar/borrar los registros (la observación queda vacía):
+    imagenes.filename_original LIKE 'prueba_%'
 """
 from __future__ import annotations
 
@@ -72,7 +72,6 @@ EXTENSIONES = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 LADO_MAX = 1600
 
 PREFIJO = "prueba_"
-OBS = "PRUEBA"
 
 # Zonas nuevas: (direccion, departamento, latitud, longitud)
 ZONAS_NUEVAS = [
@@ -84,16 +83,27 @@ ZONAS_NUEVAS = [
 # Perfil por zona: clave -> (peso_volumen, prob_smog_base, dispositivo_id)
 # Claves 1..6 = ubicaciones existentes; las nuevas se identifican por su dirección.
 PERFIL_ZONAS = {
-    1: (0.17, 0.04, 3),  # Calle Manuela Ferrufino (centro)
-    2: (0.17, 0.03, 2),  # Av. América
-    3: (0.08, 0.84, 1),  # Quillacollo Centro (smog ALTO)
-    4: (0.11, 0.04, 5),  # Sacaba Plaza
-    5: (0.12, 0.01, 6),  # Tiquipaya Centro (zona limpia)
-    6: (0.09, 0.02, 1),  # Colcapirhua Zona Sur
-    "Centro Heroínas Ayacucho, Cercado": (0.08, 0.67, 3),  # smog ALTO
-    "Av. Blanco Galindo Km 4, Cercado": (0.08, 0.38, 1),
-    "Cala Cala, Cercado": (0.08, 0.46, 2),
+    1: (0.17, 0.04, "Cámara Calle Manuela Ferrufino"),
+    2: (0.17, 0.03, "Cámara Av. América"),
+    3: (0.08, 0.84, "Cámara Quillacollo Centro"),  # smog ALTO
+    4: (0.11, 0.04, "Cámara Sacaba"),
+    5: (0.12, 0.01, "Cámara Tiquipaya"),  # zona limpia
+    6: (0.09, 0.02, "Cámara Colcapirhua Zona Sur"),
+    "Centro Heroínas Ayacucho, Cercado": (0.08, 0.67, "Cámara Heroínas y Ayacucho"),  # smog ALTO
+    "Av. Blanco Galindo Km 4, Cercado": (0.08, 0.38, "Cámara Av. Blanco Galindo"),
+    "Cala Cala, Cercado": (0.08, 0.46, "Cámara Cala Cala"),
 }
+# Una cámara por lugar: el tercer valor es el nombre del dispositivo que captura en esa zona.
+# Si no existe en la base, se crea con estas especificaciones.
+SPEC_CAMARA = dict(
+    tipo_dispositivo="Camara IP",
+    marca="Hikvision",
+    modelo="DS-2CD2043G0",
+    resolucion="1920x1080",
+    fps=30,
+    interfaz="Ethernet",
+    activo=True,
+)
 
 PROB_PLACA = 0.30
 VENTANA_SIN_REPETIR = 20  # una imagen no reaparece hasta pasar N registros de su misma clase
@@ -176,6 +186,43 @@ def asegurar_zonas(db, dry_run: bool) -> Dict[object, int]:
     return mapa
 
 
+def asegurar_dispositivos(db, zonas: Dict[object, int], dry_run: bool) -> Dict[object, Optional[int]]:
+    """Devuelve clave de zona -> dispositivo_id, creando la cámara del lugar si falta."""
+    por_nombre = {d.nombre_dispositivo: d for d in db.query(DispositivoCaptura).all()}
+    direcciones = {u.id: u.direccion for u in db.query(Ubicacion).all()}
+    mapa: Dict[object, Optional[int]] = {}
+    for clave, (_, _, nombre) in PERFIL_ZONAS.items():
+        if clave not in zonas:
+            continue
+        d = por_nombre.get(nombre) or por_nombre.get(nombre.replace("Cámara", "Camara"))
+        if d is not None and d.nombre_dispositivo != nombre and not dry_run:
+            d.nombre_dispositivo = nombre  # unificar a "Cámara" con tilde
+            db.commit()
+            por_nombre[nombre] = d
+        if d is None:
+            if dry_run:
+                print(f"[dry-run] Se crearía el dispositivo: {nombre}")
+                mapa[clave] = None
+                continue
+            lugar = clave if isinstance(clave, str) else (direcciones.get(clave) or "")
+            d = DispositivoCaptura(
+                nombre_dispositivo=nombre,
+                ubicacion_fisica=", ".join(lugar.split(",")[:2]).strip()[:255] or None,
+                fecha_instalacion=datetime(2025, 3, 10),
+                **SPEC_CAMARA,
+            )
+            db.add(d)
+            db.commit()
+            db.refresh(d)
+            por_nombre[nombre] = d
+            print(f"Dispositivo creado: {nombre} (id {d.id})")
+        elif not d.activo and not dry_run:
+            d.activo = True
+            db.commit()
+        mapa[clave] = d.id
+    return mapa
+
+
 # --------------------------------------------------------------------------- limpieza
 
 def limpiar_prueba(db) -> Dict[str, int]:
@@ -200,8 +247,7 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
     claves = [k for k in PERFIL_ZONAS if k in zonas]
     pesos = [PERFIL_ZONAS[k][0] for k in claves]
 
-    dispositivos = {d.id: d for d in db.query(DispositivoCaptura).all()}
-    activo_default = next((d.id for d in dispositivos.values() if d.activo), None)
+    disp_por_zona = asegurar_dispositivos(db, zonas, dry_run)
     usuarios = {u.username: u.id for u in db.query(Usuario).all()}
     pares = [(usuarios[n], w) for n, w in USUARIOS_PESO.items() if n in usuarios]
     user_ids = [u for u, _ in pares] or [None]
@@ -235,8 +281,8 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
         if ts > ahora:
             ts -= timedelta(days=1)
         clave = rng.choices(claves, pesos)[0]
-        _, base, disp = PERFIL_ZONAS[clave]
-        disp_id = disp if disp in dispositivos else activo_default
+        _, base, _ = PERFIL_ZONAS[clave]
+        disp_id = disp_por_zona.get(clave)
         ub_id = zonas[clave]
         usuario_id = rng.choices(user_ids, user_w)[0]
 
@@ -307,7 +353,7 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
                 confianza=r["confianza"],
                 p_smog=r["p"],
                 fecha_prediccion=r["ts"],
-                observacion=OBS,
+                observacion=None,
             )
             db.add(img)
             if (i + 1) % 200 == 0:

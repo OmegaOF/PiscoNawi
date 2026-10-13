@@ -279,7 +279,13 @@ export function rankingBarOption(items: RankItem[], ctx: ChartCtx): EChartsOptio
 }
 
 export const zonaToRank = (z: ZonaItem): RankItem => ({ id: z.ubicacion_id, label: etiquetaZona(z), pct: z.pct_smog, smog: z.smog, total: z.total });
-export const dispToRank = (d: DispositivoItem): RankItem => ({ id: d.dispositivo_id, label: d.nombre_dispositivo, pct: d.pct_smog, smog: d.smog, total: d.total });
+export const dispToRank = (d: DispositivoItem): RankItem => ({
+  id: d.dispositivo_id,
+  label: d.nombre_dispositivo.replace(/^c[aá]mara\s+/i, ''),
+  pct: d.pct_smog,
+  smog: d.smog,
+  total: d.total,
+});
 
 // --- Histograma agrupado ----------------------------------------------------
 export function histogramGroupedOption(conf: Bucket[], psmog: Bucket[], ctx: ChartCtx): EChartsOption {
