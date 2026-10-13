@@ -15,25 +15,51 @@ interface AnalisisItem {
   fecha_prediccion: string;
 }
 
+interface AnalisisPagina {
+  items: AnalisisItem[];
+  total: number;
+  page: number;
+  size: number;
+  paginas: number;
+}
+
+const POR_PAGINA = 30;
+
 const Analisis: React.FC = () => {
   const [analisisData, setAnalisisData] = useState<AnalisisItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [paginas, setPaginas] = useState(1);
 
   useEffect(() => {
+    const loadAnalisisData = async () => {
+      setLoading(true);
+      try {
+        const response = await api.get<AnalisisPagina>('/analisis/emisiones', { params: { page, size: POR_PAGINA } });
+        setAnalisisData(response.data.items);
+        setTotal(response.data.total);
+        setPaginas(response.data.paginas);
+      } catch (err) {
+        console.error('Error al cargar los análisis:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
     loadAnalisisData();
-  }, []);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [page]);
 
-  const loadAnalisisData = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get('/analisis/emisiones');
-      setAnalisisData(response.data);
-    } catch (err) {
-      console.error('Error loading analysis data:', err);
-    } finally {
-      setLoading(false);
-    }
+  const desde = total === 0 ? 0 : (page - 1) * POR_PAGINA + 1;
+  const hasta = Math.min(page * POR_PAGINA, total);
+
+  const formatFecha = (s: string) => {
+    if (!s) return '—';
+    const d = new Date(s.replace(' ', 'T'));
+    return Number.isNaN(d.getTime())
+      ? s
+      : d.toLocaleString('es-BO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
 
@@ -54,7 +80,7 @@ const Analisis: React.FC = () => {
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-vino">Análisis de Vehículos</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Tabla combinada de imágenes y predicciones de CNN.
+              Tabla combinada de imágenes y predicciones de CNN, de la más reciente a la más antigua.
             </p>
           </div>
 
@@ -74,6 +100,9 @@ const Analisis: React.FC = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Imagen
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fecha de análisis
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Placa Manual
@@ -116,6 +145,9 @@ const Analisis: React.FC = () => {
                           </div>
                         </div>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {formatFecha(item.fecha_prediccion)}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-mono font-semibold text-gray-900">
                           {item.placa_manual || '-'}
@@ -148,6 +180,47 @@ const Analisis: React.FC = () => {
               </table>
             )}
           </div>
+
+          {total > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-6 py-4 text-sm">
+              <span className="text-gray-600">
+                Mostrando <strong>{desde}</strong>–<strong>{hasta}</strong> de <strong>{total}</strong> análisis
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(1)}
+                  disabled={page <= 1 || loading}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  « Primera
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || loading}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  ‹ Anterior
+                </button>
+                <span className="px-2 text-gray-600">
+                  Página {page} de {paginas}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(paginas, p + 1))}
+                  disabled={page >= paginas || loading}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Siguiente ›
+                </button>
+                <button
+                  onClick={() => setPage(paginas)}
+                  disabled={page >= paginas || loading}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Última »
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

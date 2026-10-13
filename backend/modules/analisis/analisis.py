@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
@@ -29,11 +29,25 @@ class AnalisisItem(BaseModel):
     fecha_prediccion: str
 
 
-@router.get("/emisiones", response_model=List[AnalisisItem])
+class AnalisisPagina(BaseModel):
+    items: List[AnalisisItem]
+    total: int
+    page: int
+    size: int
+    paginas: int
+
+
+@router.get("/emisiones", response_model=AnalisisPagina)
 async def obtener_analisis_emisiones(
     current_user: Usuario = Depends(require_internal_user),
-        db: Session = Depends(get_db),
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    size: int = Query(30, ge=1, le=200),
 ):
+    """Imágenes analizadas por la CNN, de la más reciente a la más antigua, paginadas."""
+    base = db.query(Imagen.id).join(Prediccion, Imagen.id == Prediccion.imagen_id)
+    total = base.count()
+    paginas = max(1, -(-total // size))
     results = (
         db.query(
             Imagen.id,
@@ -47,26 +61,28 @@ async def obtener_analisis_emisiones(
             Prediccion.fecha_prediccion,
         )
         .join(Prediccion, Imagen.id == Prediccion.imagen_id)
+        .order_by(Prediccion.fecha_prediccion.desc(), Prediccion.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
         .all()
     )
 
-    analisis_items: List[AnalisisItem] = []
-    for row in results:
-        analisis_items.append(
-            AnalisisItem(
-                id=row.id,
-                imagen_id=row.id,
-                filename_original=row.filename_original,
-                ruta_archivo=row.ruta_archivo,
-                placa_manual=row.placa_manual,
-                clase_predicha=row.clase_predicha,
-                confianza=float(row.confianza),
-                p_smog=float(row.p_smog),
-                observacion=row.observacion,
-                fecha_prediccion=row.fecha_prediccion.strftime("%Y-%m-%d %H:%M:%S"),
-            )
+    items = [
+        AnalisisItem(
+            id=row.id,
+            imagen_id=row.id,
+            filename_original=row.filename_original,
+            ruta_archivo=row.ruta_archivo,
+            placa_manual=row.placa_manual,
+            clase_predicha=row.clase_predicha,
+            confianza=float(row.confianza or 0),
+            p_smog=float(row.p_smog or 0),
+            observacion=row.observacion,
+            fecha_prediccion=row.fecha_prediccion.strftime("%Y-%m-%d %H:%M:%S") if row.fecha_prediccion else "",
         )
-    return analisis_items
+        for row in results
+    ]
+    return AnalisisPagina(items=items, total=total, page=page, size=size, paginas=paginas)
 
 
 @router.post("/analizar/{imagen_id}")
