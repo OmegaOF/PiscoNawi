@@ -200,7 +200,6 @@ def _worker(
 
             time.sleep(0.2)
 
-        # ✅ After CNN processing completes, automatically run additional last analysis of results
         _run_post_processing_analysis(db)
 
     except Exception:
@@ -240,17 +239,12 @@ def get_status():
 
 
 def _run_post_processing_analysis(db: Session):
-    """
-    Internal function that runs additional analysis after CNN processing completes.
-    This automatically enhances predictions for today's images.
-    """
+    """Revisión final de las predicciones del día."""
     try:
         from services.modelo_service import analizar_imagen_cnn_model_step
-        # Get today's date (start of day)
         today = date.today()
         start_of_day = datetime.combine(today, datetime.min.time())
 
-        # Get all images uploaded today that have predictions
         images_with_predictions = db.query(Imagen).join(Prediccion).filter(
             Imagen.fecha_subida >= start_of_day
         ).all()
@@ -263,12 +257,10 @@ def _run_post_processing_analysis(db: Session):
 
         for imagen in images_with_predictions:
             try:
-                # Get the prediction for this image
                 prediccion = db.query(Prediccion).filter(Prediccion.imagen_id == imagen.id).first()
                 if not prediccion:
                     logger.debug("no se pudo completar el análisis de una imagen")
                     continue
-                # We need to run async function in sync context
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 resultado = loop.run_until_complete(analizar_imagen_cnn_model_step(imagen.ruta_archivo))
@@ -287,7 +279,6 @@ def _run_post_processing_analysis(db: Session):
                 db.rollback()
                 continue
 
-        # Commit all successful updates
         try:
             db.commit()
             logger.debug("procesamiento en curso")

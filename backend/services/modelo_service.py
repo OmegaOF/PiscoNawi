@@ -5,6 +5,7 @@ import os
 from typing import Dict, Any
 from .registro import logger
 from .config import (
+    PROCESS_WAVE_DEBUG,
     CNN_MODEL_STEP_INFO,
     CNN_MODEL_STEP_MAX_TOKENS,
     CNN_MODEL_STEP_REASONING,
@@ -40,12 +41,10 @@ def construir_payload(modelo: str, prompt: str, base64_image: str,
 
 
 async def analizar_imagen_cnn_model_step(ruta_archivo: str) -> Dict[str, Any]:
-    """
-    Analiza una imagen usando CNN
-    """
-    # Check if ruta_archivo is a URL or a file path
+    """Analiza una imagen de un vehículo."""
+    ruta_archivo = ruta_archivo.split('?')[0]
     if ruta_archivo.startswith('http://localhost:8000/capturas/'):
-        # Convert URL back to local file path for efficiency and reliability
+        # Se resuelve a la ruta local del archivo servido
         filename = ruta_archivo.replace('http://localhost:8000/capturas/', '')
         local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'storage', 'capturas', filename)
 
@@ -141,7 +140,6 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
         uso = result.get("usage") or {}
         logger.debug("análisis completado: entrada=%s salida=%s", uso.get("prompt_tokens"), uso.get("completion_tokens"))
 
-        # Extraer el contenido JSON de la respuesta
         if not result.get("choices") or len(result["choices"]) == 0:
             raise Exception("Servicio de análisis no retornó respuesta válida")
 
@@ -149,10 +147,8 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
         if not content:
             raise Exception("Servicio de análisis retornó contenido vacío")
 
-        # Intentar extraer y parsear JSON, manejando respuestas con markdown
         analisis = None
 
-        # Primero intentar extraer JSON de bloques de código markdown
         import re
         json_match = re.search(r'```(?:json)?\s*\n(.*?)\n```', content, re.DOTALL)
         if json_match:
@@ -162,14 +158,12 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
             except json.JSONDecodeError:
                 logger.debug("respuesta con formato inesperado (bloque)")
 
-        # Si no se encontró JSON en markdown, intentar parsear todo el contenido
         if analisis is None:
             try:
                 analisis = json.loads(content)
             except json.JSONDecodeError:
                 logger.debug("respuesta con formato inesperado")
 
-        # Si aún no hay análisis válido, usar heurística
         if analisis is None:
             logger.debug("respuesta no estructurada; se usa valor por defecto")
             analisis = {
@@ -179,5 +173,8 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
                 "descripcion_corta": content.replace('```json\n', '').replace('\n```', '').strip()[:200],
                 "placa": "undefined"
             }
+
+        if PROCESS_WAVE_DEBUG:
+            print(f"Process wave [{os.path.basename(ruta_archivo)}]:", json.dumps(analisis, ensure_ascii=False))
 
         return analisis
