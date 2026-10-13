@@ -41,6 +41,11 @@ class ProcessOutput(BaseModel):
     stdout: str = ""
     stderr: str = ""
 
+def _aclarar(frame, factor: float = 1.2):
+    """Aumenta el brillo de la imagen un 20 % sin saturar los tonos claros."""
+    return cv2.convertScaleAbs(frame, alpha=factor, beta=0)
+
+
 VERDE = (0, 255, 0)
 
 
@@ -118,7 +123,7 @@ def camera_capture_loop():
         now = time.time()
         if detected and now - last_capture > COOLDOWN:
             filename = f"{CAPTURA_DIR}/vehicle_{int(now)}.jpg"
-            cv2.imwrite(filename, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+            cv2.imwrite(filename, _aclarar(frame), [int(cv2.IMWRITE_JPEG_QUALITY), 95])
             logger.debug("Vehículo detectado: %s", filename)
             last_capture = now
 

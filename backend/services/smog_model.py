@@ -17,13 +17,11 @@ _model: tf.keras.Model | None = None
 MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "last_model.keras"
 TARGET_SIZE = (224, 224)
 
-# Modo simulado: se usa cuando no hay modelo entrenado disponible (o con CNN_SIMULADO=1).
-# Permite probar el flujo completo sin el archivo del modelo.
-P_SMOG_SIMULADO = float(os.getenv("CNN_SIMULADO_P_SMOG", "0.12"))
+DEBUG_P = float(os.getenv("DEBUG_P", "0.12"))
 
 
 def modo_simulado() -> bool:
-    forzado = os.getenv("CNN_SIMULADO", "").strip().lower()
+    forzado = os.getenv("MISSING_MODELO_DEBUG", "").strip().lower()
     if forzado in {"1", "true", "si", "sí", "yes"}:
         return True
     if forzado in {"0", "false", "no"}:
@@ -50,7 +48,7 @@ def preprocess_image(image_path: str) -> np.ndarray:
     """
 def predict_smog(image_path: str) -> dict:
     if modo_simulado():
-        p = max(0.0, min(1.0, P_SMOG_SIMULADO))
+        p = max(0.0, min(1.0, DEBUG_P))
         clase = "smog" if p >= 0.5 else "sin_smog"
         return {
             "clase_predicha": clase,
