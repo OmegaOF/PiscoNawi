@@ -79,3 +79,8 @@ build/
 # storage/
 
 storage/
+
+# Imágenes de prueba (se copian a mano a cada máquina)
+backend/dataPrueba/
+backend/dataPrueba.rar
+backend/dataPrueba.zip

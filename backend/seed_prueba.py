@@ -1,0 +1,371 @@
+"""
+Carga registros de prueba usando imágenes reales de vehículos.
+
+Estructura esperada (no se sube a git):
+    backend/dataPrueba/smog/     -> fotos de vehículos CON smog
+    backend/dataPrueba/noSmog/   -> fotos de vehículos SIN smog
+
+Qué hace:
+  1. Copia las imágenes (reducidas a 1600 px, JPEG) a storage/capturas/prueba/<carpeta>/
+     para que el backend las sirva en http://localhost:8000/capturas/prueba/...
+  2. Crea (si no existen) 3 zonas nuevas, entre ellas "Centro Heroínas Ayacucho" con smog alto.
+  3. Borra los registros demo/prueba anteriores (nunca toca registros reales).
+  4. Crea ~800 registros (imagen + predicción) en los últimos 6 meses, con horas pico,
+     días hábiles, varios dispositivos y operadores. Las placas quedan vacías
+     (se registran a mano en "Registro de placas"); usa --con-placas para rellenarlas.
+     Proporción aproximada: 1 vehículo con smog por cada 3 sin smog.
+     Las imágenes se reparten al azar sin repetirse el mismo día ni de forma consecutiva.
+
+Uso (desde la carpeta backend/, con el entorno virtual activo):
+    python seed_prueba.py                 # carga ~800 registros
+    python seed_prueba.py --dry-run       # solo muestra el resumen, no escribe nada
+    python seed_prueba.py --cantidad 1200 --meses 6 --semilla 3
+    python seed_prueba.py --limpiar       # borra los registros de prueba y demo
+
+Marcas para identificar/borrar los registros:
+    imagenes.filename_original LIKE 'prueba_%'   y   predicciones.observacion = 'PRUEBA'
+"""
+from __future__ import annotations
+
+import argparse
+import random
+import sys
+from collections import defaultdict
+from datetime import date, datetime, time, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+from PIL import Image as PILImage, ImageOps
+
+from db import (
+    Ciudad,
+    DispositivoCaptura,
+    Imagen,
+    Prediccion,
+    SessionLocal,
+    Ubicacion,
+    Usuario,
+    engine,
+    ensure_schema_upgrades,
+)
+from seed_demo import (
+    DIA_PESO,
+    DIA_SMOG_DELTA,
+    HORA_PESO,
+    HORA_SMOG_DELTA,
+    MES_SMOG_DELTA,
+    USUARIOS_PESO,
+    VOLUMEN_FINAL,
+    VOLUMEN_INICIAL,
+    _gen_placa,
+    asignar_ciudades_faltantes,
+    clean_demo,
+)
+
+BACKEND_DIR = Path(__file__).resolve().parent
+DATA_DIR = BACKEND_DIR / "dataPrueba"
+CARPETA_SMOG = "smog"
+CARPETA_SIN_SMOG = "noSmog"
+DESTINO = BACKEND_DIR.parent / "storage" / "capturas" / "prueba"
+PUBLIC_BASE_URL = "http://localhost:8000/capturas/prueba"
+EXTENSIONES = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+LADO_MAX = 1600
+
+PREFIJO = "prueba_"
+OBS = "PRUEBA"
+
+# Zonas nuevas: (direccion, departamento, latitud, longitud)
+ZONAS_NUEVAS = [
+    ("Centro Heroínas Ayacucho, Cercado", "Cochabamba", -17.39195, -66.15870),
+    ("Av. Blanco Galindo Km 4, Cercado", "Cochabamba", -17.38960, -66.19650),
+    ("Cala Cala, Cercado", "Cochabamba", -17.37320, -66.15890),
+]
+
+# Perfil por zona: clave -> (peso_volumen, prob_smog_base, dispositivo_id)
+# Claves 1..6 = ubicaciones existentes; las nuevas se identifican por su dirección.
+PERFIL_ZONAS = {
+    1: (0.17, 0.04, 3),  # Calle Manuela Ferrufino (centro)
+    2: (0.17, 0.03, 2),  # Av. América
+    3: (0.08, 0.84, 1),  # Quillacollo Centro (smog ALTO)
+    4: (0.11, 0.04, 5),  # Sacaba Plaza
+    5: (0.12, 0.01, 6),  # Tiquipaya Centro (zona limpia)
+    6: (0.09, 0.02, 1),  # Colcapirhua Zona Sur
+    "Centro Heroínas Ayacucho, Cercado": (0.08, 0.67, 3),  # smog ALTO
+    "Av. Blanco Galindo Km 4, Cercado": (0.08, 0.38, 1),
+    "Cala Cala, Cercado": (0.08, 0.46, 2),
+}
+
+PROB_PLACA = 0.30
+VENTANA_SIN_REPETIR = 20  # una imagen no reaparece hasta pasar N registros de su misma clase
+N_PLACAS_FRECUENTES, N_PLACAS_OCASIONALES, N_PLACAS_SUCIAS = 15, 45, 5
+
+
+# --------------------------------------------------------------------------- imágenes
+
+def listar_imagenes(carpeta: Path) -> List[Path]:
+    if not carpeta.is_dir():
+        return []
+    return sorted(p for p in carpeta.iterdir() if p.is_file() and p.suffix.lower() in EXTENSIONES and not p.name.startswith("."))
+
+
+def preparar_imagenes(dry_run: bool) -> Dict[str, List[str]]:
+    """Copia y reduce las imágenes a storage/capturas/prueba. Devuelve rutas relativas por clase."""
+    pools: Dict[str, List[str]] = {}
+    for clase, carpeta in (("smog", CARPETA_SMOG), ("sin_smog", CARPETA_SIN_SMOG)):
+        origen = DATA_DIR / carpeta
+        archivos = listar_imagenes(origen)
+        if not archivos:
+            raise SystemExit(f"No hay imágenes en {origen}. Copia ahí las fotos antes de correr el script.")
+        destino = DESTINO / carpeta
+        if not dry_run:
+            destino.mkdir(parents=True, exist_ok=True)
+        rel = []
+        for f in archivos:
+            nombre = f"{f.stem}.jpg"
+            salida = destino / nombre
+            if not dry_run and (not salida.exists() or salida.stat().st_mtime < f.stat().st_mtime):
+                with PILImage.open(f) as im:
+                    im = ImageOps.exif_transpose(im).convert("RGB")
+                    im.thumbnail((LADO_MAX, LADO_MAX))
+                    im.save(salida, "JPEG", quality=85, optimize=True)
+            rel.append(f"{carpeta}/{nombre}")
+        pools[clase] = rel
+        print(f"Imágenes {clase}: {len(rel)} (desde {origen})")
+    return pools
+
+
+# --------------------------------------------------------------------------- zonas
+
+def asegurar_zonas(db, dry_run: bool) -> Dict[object, int]:
+    """Devuelve clave de perfil -> ubicacion_id, creando las zonas nuevas si faltan."""
+    mapa: Dict[object, int] = {}
+    existentes = {u.id: u for u in db.query(Ubicacion).all()}
+    for k in PERFIL_ZONAS:
+        if isinstance(k, int) and k in existentes:
+            mapa[k] = k
+    ciudades = db.query(Ciudad).filter(Ciudad.latitud.isnot(None)).all()
+    for direccion, depto, lat, lng in ZONAS_NUEVAS:
+        u = db.query(Ubicacion).filter(Ubicacion.direccion == direccion).first()
+        if u is None:
+            if dry_run:
+                mapa[direccion] = -1
+                print(f"[dry-run] Se crearía la zona: {direccion}")
+                continue
+            ciudad_id = None
+            if ciudades:
+                c = min(ciudades, key=lambda c: (float(c.latitud) - lat) ** 2 + (float(c.longitud) - lng) ** 2)
+                ciudad_id = c.id
+            u = Ubicacion(
+                latitud=lat,
+                longitud=lng,
+                direccion=direccion,
+                departamento=depto,
+                precision_metros=5,
+                dispositivo="camara",
+                ciudad_id=ciudad_id,
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+            )
+            db.add(u)
+            db.commit()
+            db.refresh(u)
+            print(f"Zona creada: {direccion} (id {u.id})")
+        mapa[direccion] = u.id
+    if not mapa:
+        raise SystemExit("No hay ubicaciones disponibles. Carga primero los catálogos de la base.")
+    return mapa
+
+
+# --------------------------------------------------------------------------- limpieza
+
+def limpiar_prueba(db) -> Dict[str, int]:
+    ids = [i for (i,) in db.query(Imagen.id).filter(Imagen.filename_original.like("prueba\\_%", escape="\\")).all()]
+    pred = img = 0
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        pred += db.query(Prediccion).filter(Prediccion.imagen_id.in_(chunk)).delete(synchronize_session=False)
+        img += db.query(Imagen).filter(Imagen.id.in_(chunk)).delete(synchronize_session=False)
+    db.commit()
+    return {"predicciones": pred, "imagenes": img}
+
+
+# --------------------------------------------------------------------------- generación
+
+def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_placas: bool = False) -> dict:
+    rng = random.Random(semilla)
+    pools = preparar_imagenes(dry_run)
+    rng_img = random.Random(semilla * 7919 + 1)  # flujo aparte: asignación de imágenes y horas de subida
+    zonas = asegurar_zonas(db, dry_run)
+
+    claves = [k for k in PERFIL_ZONAS if k in zonas]
+    pesos = [PERFIL_ZONAS[k][0] for k in claves]
+
+    dispositivos = {d.id: d for d in db.query(DispositivoCaptura).all()}
+    activo_default = next((d.id for d in dispositivos.values() if d.activo), None)
+    usuarios = {u.username: u.id for u in db.query(Usuario).all()}
+    pares = [(usuarios[n], w) for n, w in USUARIOS_PESO.items() if n in usuarios]
+    user_ids = [u for u, _ in pares] or [None]
+    user_w = [w for _, w in pares] or [1.0]
+
+    hoy = date.today()
+    inicio = hoy - timedelta(days=30 * meses)
+    ahora = datetime.now()
+    dias = [inicio + timedelta(days=i) for i in range((hoy - inicio).days + 1)]
+    pesos_dia = [
+        DIA_PESO[d.weekday()] * (VOLUMEN_INICIAL + (VOLUMEN_FINAL - VOLUMEN_INICIAL) * i / max(len(dias) - 1, 1))
+        for i, d in enumerate(dias)
+    ]
+    elegidos = rng.choices(dias, pesos_dia, k=cantidad)
+
+    usadas: set = set()
+    frecuentes = [_gen_placa(rng, usadas) for _ in range(N_PLACAS_FRECUENTES)]
+    ocasionales = [_gen_placa(rng, usadas) for _ in range(N_PLACAS_OCASIONALES)]
+    sucias = set(frecuentes[:N_PLACAS_SUCIAS])
+    todas = frecuentes + ocasionales
+    pesos_placa = [4] * len(frecuentes) + [1] * len(ocasionales)
+
+    stats = defaultdict(lambda: [0, 0])
+    total_smog = 0
+    usos_img = defaultdict(int)
+    registros: List[dict] = []
+
+    for i, dia in enumerate(elegidos):
+        hora = rng.choices(range(24), HORA_PESO)[0]
+        ts = datetime.combine(dia, time(hora, rng.randint(0, 59), rng.randint(0, 59)))
+        if ts > ahora:
+            ts -= timedelta(days=1)
+        clave = rng.choices(claves, pesos)[0]
+        _, base, disp = PERFIL_ZONAS[clave]
+        disp_id = disp if disp in dispositivos else activo_default
+        ub_id = zonas[clave]
+        usuario_id = rng.choices(user_ids, user_w)[0]
+
+        placa = rng.choices(todas, pesos_placa)[0] if rng.random() < PROB_PLACA else None
+        prob = (
+            base
+            + HORA_SMOG_DELTA.get(hora, 0) * 0.4
+            + DIA_SMOG_DELTA.get(ts.weekday(), 0) * 0.6
+            + MES_SMOG_DELTA.get(ts.month, 0) * 0.6
+            + rng.gauss(0, 0.03)
+        )
+        if placa in sucias:
+            prob = 0.45
+        es_smog = rng.random() < min(max(prob, 0.01), 0.95)
+
+        if es_smog:
+            p = min(max(rng.betavariate(6, 2.2), 0.5), 0.995)
+        else:
+            p = min(max(rng.betavariate(1.8, 7), 0.005), 0.499)
+        p = round(p, 4)
+        clase = "smog" if p >= 0.5 else "sin_smog"
+        confianza = round(p if clase == "smog" else 1 - p, 4)
+        nombre_zona = clave if isinstance(clave, str) else f"U{clave}"
+        stats[nombre_zona][0] += 1
+        stats[nombre_zona][1] += clase == "smog"
+        total_smog += clase == "smog"
+
+        registros.append(
+            dict(ts=ts, clase=clase, p=p, confianza=confianza, placa=placa, usuario_id=usuario_id, ub_id=ub_id, disp_id=disp_id)
+        )
+
+    # Asignar imágenes en orden cronológico: nunca la misma imagen el mismo día
+    # ni entre las últimas N de su clase; entre las válidas, se prefiere la menos usada.
+    registros.sort(key=lambda r: r["ts"])
+    ventana = {k: min(VENTANA_SIN_REPETIR, max(1, len(v) // 2)) for k, v in pools.items()}
+    recientes = {k: [] for k in pools}
+    por_dia = defaultdict(set)
+    for r in registros:
+        pool = pools[r["clase"]]
+        dia = r["ts"].date()
+        bloqueadas = set(recientes[r["clase"]][-ventana[r["clase"]]:]) | por_dia[dia]
+        candidatas = [x for x in pool if x not in bloqueadas] or [x for x in pool if x not in por_dia[dia]] or pool
+        minimo = min(usos_img[x] for x in candidatas)
+        menos_usadas = [x for x in candidatas if usos_img[x] <= minimo + 1]
+        rel = rng_img.choice(menos_usadas)
+        r["rel"] = rel
+        usos_img[rel] += 1
+        recientes[r["clase"]].append(rel)
+        por_dia[dia].add(rel)
+
+    # Verificación: sin repeticiones el mismo día ni consecutivas
+    repetidas_dia = sum(len(v) for v in por_dia.values()) != len(registros)
+    consecutivas = sum(1 for a, b in zip(registros, registros[1:]) if a["rel"] == b["rel"])
+
+    if not dry_run:
+        for i, r in enumerate(registros):
+            img = Imagen(
+                filename_original=f"{PREFIJO}{i:04d}_{Path(r['rel']).name}",
+                ruta_archivo=f"{PUBLIC_BASE_URL}/{r['rel']}",
+                placa_manual=r["placa"] if con_placas else None,  # por defecto sin placa: se registran a mano en /placas
+                fecha_subida=r["ts"] - timedelta(seconds=rng_img.randint(5, 90)),
+                usuario_id=r["usuario_id"],
+                ubicacion_id=r["ub_id"],
+                dispositivo_captura_id=r["disp_id"],
+            )
+            img.prediccion = Prediccion(
+                clase_predicha=r["clase"],
+                confianza=r["confianza"],
+                p_smog=r["p"],
+                fecha_prediccion=r["ts"],
+                observacion=OBS,
+            )
+            db.add(img)
+            if (i + 1) % 200 == 0:
+                db.commit()
+        db.commit()
+
+    return {
+        "cantidad": cantidad,
+        "smog": total_smog,
+        "zonas": dict(stats),
+        "imagenes_distintas": len(usos_img),
+        "max_usos_imagen": max(usos_img.values()) if usos_img else 0,
+        "min_usos_imagen": min(usos_img.values()) if usos_img else 0,
+        "repetidas_mismo_dia": repetidas_dia,
+        "consecutivas": consecutivas,
+    }
+
+
+def imprimir(r: dict, dry_run: bool) -> None:
+    t, s = r["cantidad"], r["smog"]
+    print(f"\n{'[dry-run] ' if dry_run else ''}Registros: {t}  ·  con smog: {s} ({s / t * 100:.1f} %)  ·  sin smog: {t - s}"
+          f"  ·  relación ≈ 1:{(t - s) / max(s, 1):.1f}")
+    print(f"Imágenes distintas usadas: {r['imagenes_distintas']}  ·  usos por imagen: {r['min_usos_imagen']}–{r['max_usos_imagen']}")
+    print(f"Misma imagen el mismo día: {'SÍ' if r['repetidas_mismo_dia'] else 'no'}  ·  imágenes iguales seguidas: {r['consecutivas']}")
+    print("Por zona (total · con smog · %):")
+    for z, (tot, sm) in sorted(r["zonas"].items(), key=lambda x: -x[1][1] / max(x[1][0], 1)):
+        pct = sm / tot * 100 if tot else 0
+        nivel = "Alto" if pct > 60 else "Moderado" if pct > 30 else "Bajo"
+        print(f"  {z:40} {tot:4} · {sm:4} · {pct:5.1f} %  {nivel}")
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    ap = argparse.ArgumentParser(description="Carga registros de prueba con imágenes de backend/dataPrueba")
+    ap.add_argument("--cantidad", type=int, default=800)
+    ap.add_argument("--meses", type=int, default=6)
+    ap.add_argument("--semilla", type=int, default=7)
+    ap.add_argument("--dry-run", action="store_true", help="No escribe nada; solo muestra el resumen")
+    ap.add_argument("--limpiar", action="store_true", help="Borra registros de prueba y demo y termina")
+    ap.add_argument("--con-placas", action="store_true", help="Rellena placas ficticias (por defecto quedan vacías)")
+    args = ap.parse_args(argv)
+
+    ensure_schema_upgrades(engine)
+    db = SessionLocal()
+    try:
+        if args.limpiar:
+            print("Prueba eliminados:", limpiar_prueba(db))
+            print("Demo eliminados:", clean_demo(db))
+            return 0
+        if not args.dry_run:
+            asignar_ciudades_faltantes(db)
+            print("Prueba anteriores eliminados:", limpiar_prueba(db))
+            print("Demo anteriores eliminados:", clean_demo(db))
+        r = generar(db, args.cantidad, args.meses, args.semilla, args.dry_run, args.con_placas)
+        imprimir(r, args.dry_run)
+        return 0
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
