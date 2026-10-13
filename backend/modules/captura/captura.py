@@ -20,6 +20,8 @@ router = APIRouter()
 capture_process = None
 capture_thread = None
 camera_active = False
+camera_index = int(os.getenv("CAMERA_INDEX", "0"))  # Índice de cámara por defecto
+MAX_CAMARAS = int(os.getenv("MAX_CAMARAS", "4"))  # Cuántos índices probar al listar dispositivos
 CAPTURA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..", "storage", "capturas")  # Directory for YOLO captures
 CAPTURA_DIR = os.path.normpath(CAPTURA_DIR)
 
@@ -40,6 +42,28 @@ except RuntimeError as e:
 class ProcessOutput(BaseModel):
     stdout: str = ""
     stderr: str = ""
+
+
+class CameraDevice(BaseModel):
+    index: int
+    label: str
+    available: bool = True
+
+
+class IniciarCapturaRequest(BaseModel):
+    camera_index: Optional[int] = None
+
+
+def _abrir_camara(index: int):
+    """Abre la cámara del índice indicado. Devuelve el objeto VideoCapture o None si falla."""
+    cap = cv2.VideoCapture(index)
+    if not cap.isOpened():
+        cap.release()
+        return None
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce latencia/frames en cola
+    return cap
 
 def _aclarar(frame, factor: float = 1.2):
     """Aumenta el brillo de la imagen un 20 % sin saturar los tonos claros."""
@@ -76,16 +100,13 @@ def _dibujar_marca(frame, x1: int, y1: int, x2: int, etiqueta: str) -> None:
                 cv2.FONT_HERSHEY_SIMPLEX, escala_texto, (255, 255, 255), grosor_texto, cv2.LINE_AA)
 
 
-def camera_capture_loop():
+def camera_capture_loop(cap):
     """Camera capture loop with YOLO vehicle detection running in a separate thread"""
     global camera_active, model
 
     logger.debug("Iniciando captura")
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
-    if not cap.isOpened():
+    if cap is None or not cap.isOpened():
         logger.warning("No se pudo abrir la cámara")
         camera_active = False
         return
@@ -117,7 +138,7 @@ def camera_capture_loop():
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
 
                     # Marca: línea sobre el vehículo y etiqueta encima
-                    _dibujar_marca(frame, x1, y1, x2, label)
+                    _dibujar_marca(frame, x1, y1, x2, y2, label)
 
         # Save image if vehicle detected and cooldown period passed
         now = time.time()
@@ -131,6 +152,7 @@ def camera_capture_loop():
         time.sleep(0.1)
 
     cap.release()
+    camera_active = False
     logger.debug("Captura detenida")
 
 class CapturedImage(BaseModel):
@@ -141,35 +163,75 @@ class CapturedImage(BaseModel):
 class CaptureStatus(BaseModel):
     is_running: bool
     process_id: Optional[int] = None
+    camera_index: Optional[int] = None
+
+
+@router.get("/dispositivos", response_model=List[CameraDevice])
+async def listar_dispositivos(current_user: Usuario = Depends(require_internal_user)):
+    global camera_active, camera_index
+
+    # Con la captura activa no se sondean otras cámaras para no robar el dispositivo en uso.
+    if camera_active:
+        return [CameraDevice(index=camera_index, label=f"Cámara {camera_index}", available=True)]
+
+    devices = []
+    for i in range(MAX_CAMARAS):
+        cap = _abrir_camara(i)
+        if cap is not None:
+            devices.append(CameraDevice(index=i, label=f"Cámara {i}", available=True))
+            cap.release()
+    return devices
+
 
 @router.post("/iniciar", response_model=CaptureStatus)
-async def iniciar_captura(current_user: Usuario = Depends(require_internal_user)):
-    global capture_thread, camera_active
+async def iniciar_captura(
+    payload: Optional[IniciarCapturaRequest] = None,
+    current_user: Usuario = Depends(require_internal_user),
+):
+    global capture_thread, camera_active, camera_index
 
     if camera_active:
         raise HTTPException(status_code=400, detail="La captura ya está en ejecución")
+
+    index = camera_index
+    if payload is not None and payload.camera_index is not None:
+        index = payload.camera_index
+
+    # Se abre la cámara antes de lanzar el hilo para poder informar un error claro al usuario.
+    cap = _abrir_camara(index)
+    if cap is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"No se pudo abrir la cámara {index}. Verifique que esté conectada, "
+                "que no la use otra aplicación y que el backend tenga permiso de cámara."
+            ),
+        )
 
     try:
         # Ensure captura directory exists
         os.makedirs(CAPTURA_DIR, exist_ok=True)
 
         # Start camera capture in a thread
+        camera_index = index
         camera_active = True
-        capture_thread = threading.Thread(target=camera_capture_loop, daemon=True)
+        capture_thread = threading.Thread(target=camera_capture_loop, args=(cap,), daemon=True)
         capture_thread.start()
 
-        return CaptureStatus(is_running=True, process_id=os.getpid())
+        return CaptureStatus(is_running=True, process_id=os.getpid(), camera_index=camera_index)
 
     except Exception as e:
         camera_active = False
+        cap.release()
         raise HTTPException(status_code=500, detail=f"Error al iniciar captura: {str(e)}")
+
 
 @router.post("/detener", response_model=CaptureStatus)
 async def detener_captura(current_user: Usuario = Depends(require_internal_user)):
     global capture_thread, camera_active
 
     if not camera_active:
-        return CaptureStatus(is_running=False)
+        return CaptureStatus(is_running=False, camera_index=camera_index)
 
     try:
         # Stop camera capture
@@ -179,16 +241,21 @@ async def detener_captura(current_user: Usuario = Depends(require_internal_user)
         if capture_thread and capture_thread.is_alive():
             capture_thread.join(timeout=5)
 
-        return CaptureStatus(is_running=False)
+        return CaptureStatus(is_running=False, camera_index=camera_index)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al detener captura: {str(e)}")
+
 
 @router.get("/estado", response_model=CaptureStatus)
 async def obtener_estado_captura(current_user: Usuario = Depends(require_internal_user)):
     global camera_active
 
-    return CaptureStatus(is_running=camera_active, process_id=os.getpid() if camera_active else None)
+    return CaptureStatus(
+        is_running=camera_active,
+        process_id=os.getpid() if camera_active else None,
+        camera_index=camera_index if camera_active else None,
+    )
 
 @router.get("/logs", response_model=ProcessOutput)
 async def obtener_logs_captura(current_user: Usuario = Depends(require_internal_user)):

@@ -11,11 +11,20 @@ interface CapturedImage {
 interface CaptureStatus {
   is_running: boolean;
   process_id: number | null;
+  camera_index: number | null;
+}
+
+interface CameraDevice {
+  index: number;
+  label: string;
+  available: boolean;
 }
 
 const Captura: React.FC = () => {
-  const [status, setStatus] = useState<CaptureStatus>({ is_running: false, process_id: null });
+  const [status, setStatus] = useState<CaptureStatus>({ is_running: false, process_id: null, camera_index: null });
   const [images, setImages] = useState<CapturedImage[]>([]);
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const [selectedCamera, setSelectedCamera] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -24,6 +33,7 @@ const Captura: React.FC = () => {
   useEffect(() => {
     checkStatus();
     loadImages();
+    loadCameras();
 
     // Set up interval to refresh images when capture is running
     const interval = setInterval(() => {
@@ -39,6 +49,18 @@ const Captura: React.FC = () => {
     try {
       const response = await api.get('/captura/estado');
       setStatus(response.data);
+    } catch (err) {
+    }
+  };
+
+  const loadCameras = async () => {
+    try {
+      const response = await api.get('/captura/dispositivos');
+      const devices: CameraDevice[] = response.data;
+      setCameras(devices);
+      if (devices.length > 0) {
+        setSelectedCamera((prev) => (devices.some((d) => d.index === prev) ? prev : devices[0].index));
+      }
     } catch (err) {
     }
   };
@@ -60,7 +82,7 @@ const Captura: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('/captura/iniciar');
+      const response = await api.post('/captura/iniciar', { camera_index: selectedCamera });
       setStatus(response.data);
       // Reload images after a short delay
       setTimeout(loadImages, 2000);
@@ -77,6 +99,7 @@ const Captura: React.FC = () => {
     try {
       const response = await api.post('/captura/detener');
       setStatus(response.data);
+      loadCameras();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error al detener captura');
     } finally {
@@ -151,6 +174,37 @@ const Captura: React.FC = () => {
               Estado: {status.is_running ? 'Ejecutándose' : 'Detenido'}
               {status.process_id && ` (PID: ${status.process_id})`}
             </span>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+            <div>
+              <label htmlFor="camera-select" className="block text-sm font-medium text-gray-700 mb-1">
+                Cámara
+              </label>
+              <select
+                id="camera-select"
+                value={selectedCamera}
+                onChange={(e) => setSelectedCamera(Number(e.target.value))}
+                disabled={status.is_running || loading}
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {cameras.length === 0 && <option value={selectedCamera}>No se detectaron cámaras</option>}
+                {cameras.map((cam) => (
+                  <option key={cam.index} value={cam.index}>
+                    {cam.label} (índice {cam.index})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={loadCameras}
+              disabled={status.is_running || loading}
+              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Volver a buscar cámaras disponibles"
+            >
+              Buscar cámaras
+            </button>
           </div>
 
           <div className="flex space-x-4 flex-wrap gap-2">
