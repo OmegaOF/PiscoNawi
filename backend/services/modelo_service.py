@@ -3,6 +3,7 @@ import base64
 import json
 import os
 from typing import Dict, Any
+from .registro import logger
 from .config import (
     CNN_MODEL_STEP_INFO,
     CNN_MODEL_STEP_MAX_TOKENS,
@@ -14,39 +15,29 @@ from .config import (
 ESFUERZOS_VALIDOS = {"minimal", "low", "medium", "high"}
 
 
-def es_modelo_razonamiento(modelo: str) -> bool:
-    """gpt-5.x y la serie o (o1, o3, o4) usan otra forma de petición que gpt-4o / gpt-4.1."""
-    m = (modelo or "").lower()
-    return m.startswith("gpt-5") or m.startswith(("o1", "o3", "o4"))
-
-
 def construir_payload(modelo: str, prompt: str, base64_image: str,
                       max_tokens=None, esfuerzo=None) -> Dict[str, Any]:
-    """Arma la petición según la familia del modelo indicado en CNN_MODEL_STEP_VERSION."""
-    mensajes = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
-            ],
-        }
-    ]
-    if not es_modelo_razonamiento(modelo):
-        # gpt-4o / gpt-4.1: petición original, sin cambios
-        return {"model": modelo, "messages": mensajes, "max_tokens": int(max_tokens or 500)}
-
-    # gpt-5.x / o-series: max_completion_tokens incluye los tokens de razonamiento
+    """Arma la petición de análisis de imagen (modelo con razonamiento y respuesta JSON)."""
     payload = {
         "model": modelo,
-        "messages": mensajes,
-        "max_completion_tokens": int(max_tokens or 4000),
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
+                ],
+            }
+        ],
+        # El límite incluye los tokens de razonamiento
+        "max_completion_tokens": int(max_tokens or 16000),
         "response_format": {"type": "json_object"},
     }
-    esfuerzo = (esfuerzo or "low").lower()
-    if esfuerzo in ESFUERZOS_VALIDOS and "chat" not in modelo.lower():
+    esfuerzo = (esfuerzo or "medium").lower()
+    if esfuerzo in ESFUERZOS_VALIDOS:
         payload["reasoning_effort"] = esfuerzo
     return payload
+
 
 async def analizar_imagen_cnn_model_step(ruta_archivo: str) -> Dict[str, Any]:
     """
@@ -57,7 +48,6 @@ async def analizar_imagen_cnn_model_step(ruta_archivo: str) -> Dict[str, Any]:
         # Convert URL back to local file path for efficiency and reliability
         filename = ruta_archivo.replace('http://localhost:8000/capturas/', '')
         local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'storage', 'capturas', filename)
-        print(f"Convirtiendo URL a ruta local: {ruta_archivo} -> {local_path}")
 
         if not os.path.exists(local_path):
             raise FileNotFoundError(f"Archivo de imagen no encontrado en ruta local: {local_path} (desde URL: {ruta_archivo})")
@@ -132,30 +122,24 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
         esfuerzo=CNN_MODEL_STEP_REASONING,
     )
 
-    timeout = 120.0 if es_modelo_razonamiento(CNN_MODEL_STEP_VERSION) else 60.0
+    timeout = 120.0
     async with httpx.AsyncClient(timeout=timeout) as client:
         try:
             response = await client.post(CNN_MODEL_STEP_URL, headers=headers, json=payload)
         except httpx.RequestError as e:
-            raise Exception(f"Error de conexión con servicio de análisis: {str(e)}")
+            raise Exception("No se pudo conectar con el servicio de análisis")
 
         if response.status_code != 200:
-            error_text = response.text[:500] if response.text else "Sin detalles del error"
-            raise Exception(f"Error en servicio de análisis: {response.status_code} - {error_text}")
+            logger.debug("servicio de análisis respondió %s", response.status_code)
+            raise Exception(f"El servicio de análisis no está disponible (código {response.status_code})")
 
         try:
             result = response.json()
         except json.JSONDecodeError as e:
-            raise Exception(f"Respuesta inválida del servicio de análisis: {str(e)}")
+            raise Exception("Respuesta inválida del servicio de análisis")
 
-        # Registrar consumo real de tokens (útil para medir costo por imagen)
         uso = result.get("usage") or {}
-        razonamiento = (uso.get("completion_tokens_details") or {}).get("reasoning_tokens", 0)
-        print(
-            f"[modelo] {result.get('model', CNN_MODEL_STEP_VERSION)} tokens: entrada={uso.get('prompt_tokens')} "
-            f"salida={uso.get('completion_tokens')} (razonamiento={razonamiento}) "
-            f"finish={((result.get('choices') or [{}])[0]).get('finish_reason')}"
-        )
+        logger.debug("análisis completado: entrada=%s salida=%s", uso.get("prompt_tokens"), uso.get("completion_tokens"))
 
         # Extraer el contenido JSON de la respuesta
         if not result.get("choices") or len(result["choices"]) == 0:
@@ -176,18 +160,18 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
             try:
                 analisis = json.loads(json_content)
             except json.JSONDecodeError:
-                print(f"Error parseando JSON extraído de markdown: {json_content}")
+                logger.debug("respuesta con formato inesperado (bloque)")
 
         # Si no se encontró JSON en markdown, intentar parsear todo el contenido
         if analisis is None:
             try:
                 analisis = json.loads(content)
             except json.JSONDecodeError:
-                print(f"Error parseando JSON directamente: {content[:200]}...")
+                logger.debug("respuesta con formato inesperado")
 
         # Si aún no hay análisis válido, usar heurística
         if analisis is None:
-            print(f"Advertencia: Servicio de análisis retornó respuesta no-JSON, usando heurística: {content[:200]}...")
+            logger.debug("respuesta no estructurada; se usa valor por defecto")
             analisis = {
                 "smog_visible": "smog" in content.lower() and "false" not in content.lower().split("smog")[1][:20] if "smog" in content.lower() else False,
                 "porcentaje_smog": 50,

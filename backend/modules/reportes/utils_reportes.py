@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import List, Optional
 
 from PIL import Image as PILImage
+
+from services.registro import logger
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -78,7 +80,7 @@ def observacion_por_pct_smog(pct_smog: float) -> str:
 def _get_watermark_image_info(src_path: Path):
     if not src_path.exists():
         if not _WATERMARK_CACHE["missing_reported"]:
-            print(f"[reportes] FondoReport.png no encontrado: {src_path}")
+            logger.debug("FondoReport.png no encontrado: %s", src_path)
             _WATERMARK_CACHE["missing_reported"] = True
         return None
 
@@ -174,7 +176,7 @@ def build_page_callbacks(report_title: str):
                 y = (height - wm_h) / 2
                 canvas.drawImage(wm_path, x, y, width=wm_w, height=wm_h, preserveAspectRatio=True, mask='auto')
         except Exception as exc:
-            print(f"[reportes] No se pudo dibujar FondoReport.png como marca de agua: {exc}")
+            logger.debug("No se pudo dibujar la marca de agua: %s", exc)
 
         # 2) Header / footer encima de la marca
         canvas.setStrokeColor(COLOR_PRINCIPAL)

@@ -112,7 +112,7 @@ async def analizar_con_ia(
 
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error en el análisis con IA: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en el análisis: {str(e)}")
 
 
 async def _reverse_geocode_nombre(lat: float, lng: float) -> Optional[str]:

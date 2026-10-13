@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # sin mensajes de TensorFlow en consola
+
 from pathlib import Path
 import numpy as np
 try:

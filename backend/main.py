@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 import os
 
 from db import engine, Base, get_db, ensure_schema_upgrades
+from services.registro import logger
 from modules.auth.auth import authenticate_user, create_access_token, Token, UserLogin, get_current_user
 from modules.captura.captura import router as captura_router
 from modules.analisis.analisis import router as analisis_router
@@ -23,14 +24,14 @@ from modules.placas.placas import router as placas_router
 # Test database connection and create tables if needed
 try:
     with engine.connect() as conn:
-        print("Database connection successful!")
+        logger.debug("Conexión a la base de datos correcta")
     Base.metadata.create_all(bind=engine)
     applied = ensure_schema_upgrades(engine)
     if applied:
-        print(f"Schema upgrades applied: {applied}")
-    print("Database tables ready!")
+        logger.debug("Columnas agregadas: %s", applied)
+    logger.debug("Tablas listas")
 except Exception as e:
-    print(f"Database connection failed: {e}")
+    print(f"No se pudo conectar a la base de datos: {e}")
     raise
 
 app = FastAPI(title="PISCONAWI IA API", version="1.0.0")

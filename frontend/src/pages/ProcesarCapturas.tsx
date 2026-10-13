@@ -177,7 +177,6 @@ const ProcesarCapturas: React.FC = () => {
     } catch (err) {
       // If it fails, don't break the UI
       // (for example if endpoint doesn't exist yet)
-      // console.error('Error getting CNN status:', err);
     }
   }, [processingCNN]);
 
@@ -199,7 +198,6 @@ const ProcesarCapturas: React.FC = () => {
       // Limit to most recent 20 images to prevent UI overload
       setImages(response.data.slice(0, 20));
     } catch (err) {
-      console.error('Error loading images:', err);
     } finally {
       setRefreshing(false);
     }
@@ -220,7 +218,6 @@ const ProcesarCapturas: React.FC = () => {
       await api.post('/analisis/procesar-cnn', body);
       await loadCnnStatus();
     } catch (err: any) {
-      console.error('Error starting CNN:', err);
       setProcessingCNN(false);
       setProgress(0);
       setError(err.response?.data?.detail || 'Error al iniciar el procesamiento CNN');

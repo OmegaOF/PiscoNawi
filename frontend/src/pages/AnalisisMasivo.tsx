@@ -21,7 +21,6 @@ const AnalisisMasivo: React.FC = () => {
       setResult(response.data);
       alert('Análisis masivo completado exitosamente');
     } catch (err: any) {
-      console.error('Error analyzing all images:', err);
       alert(`Error en el análisis masivo: ${err.response?.data?.detail || 'Error desconocido'}`);
     } finally {
       setLoading(false);

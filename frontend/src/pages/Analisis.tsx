@@ -42,7 +42,6 @@ const Analisis: React.FC = () => {
         setTotal(response.data.total);
         setPaginas(response.data.paginas);
       } catch (err) {
-        console.error('Error al cargar los análisis:', err);
       } finally {
         setLoading(false);
       }

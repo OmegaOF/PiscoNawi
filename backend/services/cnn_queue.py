@@ -1,4 +1,5 @@
 import os
+from services.registro import logger
 import glob
 import threading
 import time
@@ -153,7 +154,7 @@ def _worker(
                 current_file = filename
 
             # 1) asegurar fila en imagenes (guardando URL pública y opcional ubicación)
-            print("cnn procesando")
+            logger.debug("procesamiento en curso")
             img_row = _ensure_image_row(
                 db,
                 image_path,
@@ -189,7 +190,7 @@ def _worker(
     except Exception as e:
         if db:
             db.rollback()
-        print("modelo no encontrado")
+        logger.debug("no se pudo completar el análisis de una imagen")
     finally:
         if db:
             db.close()
@@ -206,7 +207,7 @@ def start_queue(
     dispositivo_id: Optional[int] = None,
 ):
     """Inicia la cola FIFO si no está corriendo. Opcionalmente asocia las imágenes a ubicacion_id."""
-    print("cnn procesando")
+    logger.debug("procesamiento en curso")
     t = threading.Thread(target=_worker, args=(ubicacion_id, user_id, dispositivo_id), daemon=True)
     t.start()
 
@@ -241,7 +242,7 @@ def _run_post_processing_analysis(db: Session):
         if not images_with_predictions:
             return
 
-        print("cnn procesando")
+        logger.debug("procesamiento en curso")
 
 
         for imagen in images_with_predictions:
@@ -249,7 +250,7 @@ def _run_post_processing_analysis(db: Session):
                 # Get the prediction for this image
                 prediccion = db.query(Prediccion).filter(Prediccion.imagen_id == imagen.id).first()
                 if not prediccion:
-                    print("modelo no encontrado")
+                    logger.debug("no se pudo completar el análisis de una imagen")
                     continue
                 # We need to run async function in sync context
                 loop = asyncio.new_event_loop()
@@ -266,19 +267,19 @@ def _run_post_processing_analysis(db: Session):
 
 
             except Exception as e:
-                print("modelo no encontrado")
+                logger.debug("no se pudo completar el análisis de una imagen")
                 db.rollback()
                 continue
 
         # Commit all successful updates
         try:
             db.commit()
-            print("cnn procesando")
+            logger.debug("procesamiento en curso")
         except Exception as e:
             db.rollback()
-            print("modelo no encontrado")
+            logger.debug("no se pudo completar el análisis de una imagen")
 
     except Exception as e:
-        print("modelo no encontrado")
+        logger.debug("no se pudo completar el análisis de una imagen")
         if db:
             db.rollback()

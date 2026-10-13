@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 import os
+from services.registro import logger
 from datetime import datetime
 import glob
 import threading
@@ -23,18 +24,18 @@ CAPTURA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..
 CAPTURA_DIR = os.path.normpath(CAPTURA_DIR)
 
 # Load YOLO model for vehicle detection
-print("Loading YOLOv8 model...")
+logger.debug("Cargando modelo de detección...")
 model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "yolov8n.pt")
 model = YOLO(model_path)
 
 # Try to use Mac GPU acceleration (M1/M2/M3), fallback to CPU if not available
 try:
     model.to("mps")
-    print("YOLO model loaded and configured for MPS acceleration")
+    logger.debug("Modelo de detección listo (aceleración MPS)")
 except RuntimeError as e:
-    print(f"MPS acceleration not available ({e}), using CPU instead")
+    logger.debug("Aceleración MPS no disponible, se usa CPU")
     model.to("cpu")
-    print("YOLO model loaded and configured for CPU")
+    logger.debug("Modelo de detección listo (CPU)")
 
 class ProcessOutput(BaseModel):
     stdout: str = ""
@@ -44,22 +45,22 @@ def camera_capture_loop():
     """Camera capture loop with YOLO vehicle detection running in a separate thread"""
     global camera_active, model
 
-    print("🚗 Starting vehicle detection capture...")
+    logger.debug("Iniciando captura")
     cap = cv2.VideoCapture(0)
 
     if not cap.isOpened():
-        print("❌ Could not open camera")
+        logger.warning("No se pudo abrir la cámara")
         camera_active = False
         return
 
-    print("✅ Camera opened successfully!")
+    logger.debug("Cámara abierta")
     last_capture = 0
     COOLDOWN = 5  # tiempo de espera netre captura
 
     while camera_active:
         ret, frame = cap.read()
         if not ret:
-            print("❌ Failed to read frame")
+            logger.debug("No se pudo leer un cuadro")
             break
 
         # Run YOLO detection
@@ -88,14 +89,14 @@ def camera_capture_loop():
         if detected and now - last_capture > COOLDOWN:
             filename = f"{CAPTURA_DIR}/vehicle_{int(now)}.jpg"
             cv2.imwrite(filename, frame)
-            print(f"🚗 Vehicle detected! Saved: {filename}")
+            logger.debug("Vehículo detectado: %s", filename)
             last_capture = now
 
         # Small delay to prevent high CPU usage
         time.sleep(0.1)
 
     cap.release()
-    print("📷 Vehicle detection capture stopped")
+    logger.debug("Captura detenida")
 
 class CapturedImage(BaseModel):
     filename: str

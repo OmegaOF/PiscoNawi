@@ -38,7 +38,6 @@ const Captura: React.FC = () => {
       const response = await api.get('/captura/estado');
       setStatus(response.data);
     } catch (err) {
-      console.error('Error checking status:', err);
     }
   };
 
@@ -49,7 +48,6 @@ const Captura: React.FC = () => {
       // Limit to most recent 20 images to prevent UI overload
       setImages(response.data.slice(0, 20));
     } catch (err) {
-      console.error('Error loading images:', err);
     } finally {
       setRefreshing(false);
     }
@@ -100,7 +98,6 @@ const Captura: React.FC = () => {
       await api.delete(`/captura/eliminar/${filename}`);
       setImages(images.filter(img => img.filename !== filename));
     } catch (err) {
-      console.error('Error deleting image:', err);
       setError('Error al eliminar imagen');
     }
   };
