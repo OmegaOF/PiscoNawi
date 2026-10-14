@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowDownTrayIcon, ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import api from '../lib/api';
 
+// Activar con REACT_APP_DEBUG_CAMARAS=1 para ver el detalle en la consola del navegador.
+const DEBUG_CAMARAS = process.env.REACT_APP_DEBUG_CAMARAS === '1';
+
 interface CapturedImage {
   filename: string;
   url: string; // HTTP URL to the image
@@ -55,40 +58,55 @@ const Captura: React.FC = () => {
   };
 
   // El navegador conoce el nombre real de cada cámara; el backend solo su índice.
+  // Nunca debe impedir que se muestre la lista: si falla o tarda, se usan los nombres genéricos.
   const nombresDelNavegador = async (): Promise<string[]> => {
+    const conTiempoLimite = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('tiempo agotado')), ms))]);
     try {
       if (!navigator.mediaDevices?.enumerateDevices) return [];
-      let dispositivos = await navigator.mediaDevices.enumerateDevices();
-      let camaras = dispositivos.filter((d) => d.kind === 'videoinput');
-      // Sin permiso concedido las etiquetas llegan vacías: se pide una vez y se vuelve a leer.
+      let camaras = (await conTiempoLimite(navigator.mediaDevices.enumerateDevices(), 3000)).filter(
+        (d) => d.kind === 'videoinput',
+      );
       if (camaras.length > 0 && camaras.every((d) => !d.label)) {
-        const permiso = await navigator.mediaDevices.getUserMedia({ video: true });
+        const permiso = await conTiempoLimite(navigator.mediaDevices.getUserMedia({ video: true }), 8000);
         permiso.getTracks().forEach((t) => t.stop());
-        dispositivos = await navigator.mediaDevices.enumerateDevices();
-        camaras = dispositivos.filter((d) => d.kind === 'videoinput');
+        // Da un instante al sistema para liberar la cámara antes de que el backend la abra
+        await new Promise((r) => setTimeout(r, 400));
+        camaras = (await conTiempoLimite(navigator.mediaDevices.enumerateDevices(), 3000)).filter(
+          (d) => d.kind === 'videoinput',
+        );
       }
       return camaras.map((d) => d.label);
-    } catch {
+    } catch (e) {
+      if (DEBUG_CAMARAS) console.warn('[camaras] no se pudieron obtener los nombres:', e);
       return [];
     }
   };
 
   const loadCameras = async (refrescar = false) => {
     setBuscandoCamaras(true);
+    setError('');
     try {
-      const [response, nombres] = await Promise.all([
-        api.get<CameraDevice[]>('/captura/dispositivos', { params: refrescar ? { refrescar: true } : undefined }),
-        nombresDelNavegador(),
-      ]);
-      const devices = response.data.map((cam, i) => ({
+      // Los nombres son opcionales: se piden primero y, pase lo que pase, luego se consulta el backend.
+      const nombres = await nombresDelNavegador();
+      const response = await api.get<CameraDevice[]>('/captura/dispositivos', {
+        params: refrescar ? { refrescar: true } : undefined,
+      });
+      const devices = (response.data || []).map((cam, i) => ({
         ...cam,
         label: nombres[i]?.trim() || cam.label,
       }));
+      if (DEBUG_CAMARAS) console.info('[camaras] backend:', response.data, '| nombres:', nombres);
       setCameras(devices);
       if (devices.length > 0) {
         setSelectedCamera((prev) => (devices.some((d) => d.index === prev) ? prev : devices[0].index));
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (DEBUG_CAMARAS) console.error('[camaras] error al listar:', err);
+      setError(
+        err?.response?.data?.detail ||
+          'No se pudo obtener la lista de cámaras. Revisa que el servidor esté activo y vuelve a intentar.',
+      );
     } finally {
       setBuscandoCamaras(false);
     }

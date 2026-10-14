@@ -233,22 +233,29 @@ class CaptureStatus(BaseModel):
     camera_index: Optional[int] = None
 
 
-def _probar_indice(i: int) -> Optional[CameraDevice]:
+def _probar_indice(i: int):
+    """Devuelve (dispositivo o None, detalle para el registro)."""
+    inicio = time.time()
     cap = _abrir_camara(i)
     if cap is None:
-        return None
+        return None, f"cámara {i}: no abre ({time.time() - inicio:.2f}s)"
     entrega = _entrega_imagen(cap)
     cap.release()
-    return CameraDevice(index=i, label=f"Cámara {i}", available=entrega)
+    detalle = f"cámara {i}: abre, entrega={entrega} ({time.time() - inicio:.2f}s)"
+    return CameraDevice(index=i, label=f"Cámara {i}", available=entrega), detalle
 
 
 def _sondear_camaras() -> List[CameraDevice]:
     """Busca cámaras disponibles. Los índices se prueban en paralelo para no acumular esperas."""
+    inicio = time.time()
+    logger.debug("sondeo: sistema=%s backend=%s índices=%s", sys.platform, _backend_video(), MAX_CAMARAS)
     with _SinSalidaNativa():
         with ThreadPoolExecutor(max_workers=MAX_CAMARAS) as pool:
             resultados = list(pool.map(_probar_indice, range(MAX_CAMARAS)))
-    devices = [d for d in resultados if d is not None]
-    logger.debug("cámaras detectadas: %s", [(d.index, d.available) for d in devices])
+    for _, detalle in resultados:
+        logger.debug("%s", detalle)
+    devices = [d for d, _ in resultados if d is not None]
+    logger.debug("sondeo terminado en %.2fs: %s", time.time() - inicio, [(d.index, d.available) for d in devices])
     return devices
 
 
@@ -265,10 +272,12 @@ async def listar_dispositivos(
 
     vigente = _camaras_cache and (time.time() - _camaras_cache_ts) < CACHE_CAMARAS_SEG
     if vigente and not refrescar:
+        logger.debug("dispositivos: %s desde caché", len(_camaras_cache))
         return _camaras_cache
 
     _camaras_cache = await run_in_threadpool(_sondear_camaras)
     _camaras_cache_ts = time.time()
+    logger.debug("dispositivos: se devuelven %s", len(_camaras_cache))
     return _camaras_cache
 
 
