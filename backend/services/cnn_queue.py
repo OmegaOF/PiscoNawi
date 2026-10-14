@@ -238,16 +238,22 @@ def get_status():
         }
 
 
-def _run_post_processing_analysis(db: Session):
-    """Revisión final de las predicciones del día."""
+MARCA_REVISADA = "R"  # Señal interna: esta predicción ya pasó la revisión final
+
+
+def _run_post_processing_analysis(db: Session, reanalizar: bool = False):
+    """Revisión final de las predicciones del día. Solo revisa las que aún no se revisaron."""
     try:
         from services.modelo_service import analizar_imagen_cnn_model_step
         today = date.today()
         start_of_day = datetime.combine(today, datetime.min.time())
 
-        images_with_predictions = db.query(Imagen).join(Prediccion).filter(
-            Imagen.fecha_subida >= start_of_day
-        ).all()
+        consulta = db.query(Imagen).join(Prediccion).filter(Imagen.fecha_subida >= start_of_day)
+        if not reanalizar:
+            consulta = consulta.filter(
+                (Prediccion.observacion.is_(None)) | (Prediccion.observacion != MARCA_REVISADA)
+            )
+        images_with_predictions = consulta.all()
 
         if not images_with_predictions:
             return
@@ -269,7 +275,7 @@ def _run_post_processing_analysis(db: Session):
                 prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
                 prediccion.confianza = resultado["nivel_confianza"] / 100.0
                 prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
-                prediccion.observacion = ""
+                prediccion.observacion = MARCA_REVISADA
                 prediccion.fecha_prediccion = func.now()
 
 
