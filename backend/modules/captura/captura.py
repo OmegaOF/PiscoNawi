@@ -20,6 +20,8 @@ from typing import Optional
 from ultralytics import YOLO
 from pydantic import BaseModel
 
+from concurrent.futures import ThreadPoolExecutor
+
 from starlette.concurrency import run_in_threadpool
 
 from modules.roles.roles import require_internal_user
@@ -73,7 +75,10 @@ def _backend_video() -> int:
     """Elige el sistema de captura adecuado para cada sistema operativo."""
     forzado = os.getenv("VIDEO_BACKEND", "").strip().upper()
     if forzado:
-        return getattr(cv2, f"CAP_{forzado}", cv2.CAP_ANY)
+        elegido = getattr(cv2, f"CAP_{forzado}", None)
+        if elegido is not None:
+            return elegido
+        logger.warning("VIDEO_BACKEND no reconocido: %s", forzado)
     if sys.platform.startswith("win"):
         return cv2.CAP_DSHOW      # DirectShow: evita los fallos de MSMF
     if sys.platform == "darwin":
@@ -228,17 +233,21 @@ class CaptureStatus(BaseModel):
     camera_index: Optional[int] = None
 
 
+def _probar_indice(i: int) -> Optional[CameraDevice]:
+    cap = _abrir_camara(i)
+    if cap is None:
+        return None
+    entrega = _entrega_imagen(cap)
+    cap.release()
+    return CameraDevice(index=i, label=f"Cámara {i}", available=entrega)
+
+
 def _sondear_camaras() -> List[CameraDevice]:
-    """Busca cámaras disponibles. Operación costosa: su resultado se cachea."""
-    devices: List[CameraDevice] = []
+    """Busca cámaras disponibles. Los índices se prueban en paralelo para no acumular esperas."""
     with _SinSalidaNativa():
-        for i in range(MAX_CAMARAS):
-            cap = _abrir_camara(i)
-            if cap is None:
-                continue
-            entrega = _entrega_imagen(cap)
-            cap.release()
-            devices.append(CameraDevice(index=i, label=f"Cámara {i}", available=entrega))
+        with ThreadPoolExecutor(max_workers=MAX_CAMARAS) as pool:
+            resultados = list(pool.map(_probar_indice, range(MAX_CAMARAS)))
+    devices = [d for d in resultados if d is not None]
     logger.debug("cámaras detectadas: %s", [(d.index, d.available) for d in devices])
     return devices
 
