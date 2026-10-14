@@ -40,55 +40,6 @@ def construir_payload(modelo: str, prompt: str, base64_image: str,
     return payload
 
 
-MARGEN_RECORTE = 0.35  # Proporción extra alrededor del vehículo (incluye suelo y escape)
-LADO_MIN_RECORTE = 320  # Por debajo de este tamaño no se recorta: se perdería detalle
-
-
-def _recortar_vehiculo(image_data: bytes) -> bytes:
-    """Recorta la imagen al vehículo detectado para quitar el fondo que no aporta.
-
-    Si no se detecta ninguno, devuelve la imagen original sin cambios.
-    """
-    try:
-        import cv2
-        import numpy as np
-
-        from modules.captura.captura import model
-
-        arr = cv2.imdecode(np.frombuffer(image_data, np.uint8), cv2.IMREAD_COLOR)
-        if arr is None:
-            return image_data
-        alto, ancho = arr.shape[:2]
-
-        cajas = []
-        for r in model(arr, conf=0.4, verbose=False):
-            for box in r.boxes:
-                if model.names[int(box.cls[0])] in ("car", "truck", "bus", "motorbike", "motorcycle"):
-                    cajas.append(list(map(int, box.xyxy[0])))
-        if not cajas:
-            return image_data
-
-        # El vehículo de interés es el más grande del cuadro
-        x1, y1, x2, y2 = max(cajas, key=lambda c: (c[2] - c[0]) * (c[3] - c[1]))
-        mx = int((x2 - x1) * MARGEN_RECORTE)
-        my = int((y2 - y1) * MARGEN_RECORTE)
-        x1, y1 = max(0, x1 - mx), max(0, y1 - my)
-        x2, y2 = min(ancho, x2 + mx), min(alto, y2 + my)
-        if (x2 - x1) < LADO_MIN_RECORTE or (y2 - y1) < LADO_MIN_RECORTE:
-            return image_data
-        if (x2 - x1) * (y2 - y1) > 0.85 * ancho * alto:
-            return image_data  # ya ocupa casi todo: no vale la pena recortar
-
-        ok, buf = cv2.imencode(".jpg", arr[y1:y2, x1:x2], [int(cv2.IMWRITE_JPEG_QUALITY), 92])
-        if not ok:
-            return image_data
-        logger.debug("recorte %sx%s (original %sx%s)", x2 - x1, y2 - y1, ancho, alto)
-        return buf.tobytes()
-    except Exception:
-        logger.debug("no se pudo recortar la imagen", exc_info=True)
-        return image_data
-
-
 async def analizar_imagen_cnn_model_step(ruta_archivo: str) -> Dict[str, Any]:
     """Analiza una imagen de un vehículo."""
     ruta_archivo = ruta_archivo.split('?')[0]
@@ -130,8 +81,6 @@ async def analizar_imagen_cnn_model_step(ruta_archivo: str) -> Dict[str, Any]:
                     raise ValueError(f"El archivo de imagen está vacío: {ruta_archivo}")
         except IOError as e:
             raise Exception(f"Error al leer el archivo: {ruta_archivo} - {str(e)}")
-
-    image_data = _recortar_vehiculo(image_data)
 
     # Codificar la imagen en base64
     try:
