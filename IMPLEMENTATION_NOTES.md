@@ -19,7 +19,7 @@ from sqlalchemy import func
 - **Purpose**: Automatically runs additional analysis after CNN processing completes
 - **Key Features**:
   - Processes all images uploaded today that have CNN predictions
-  - Uses the existing `analizar_imagen_modelo()` function from `modelo_service.py`  - Runs async code in a synchronous context using `asyncio.new_event_loop()`
+  - Uses the existing `analizar_imagen_cnn_model_step()` function from `modelo_service.py`  - Runs async code in a synchronous context using `asyncio.new_event_loop()`
   - Updates predictions with enhanced analysis results
   - Handles license plate detection and updates
   - Commits all changes at once for efficiency

@@ -234,7 +234,7 @@ def camera_capture_loop(cap):
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
 
                     # Marca: línea sobre el vehículo y etiqueta encima
-                    _dibujar_marca(frame, x1, y1, x2, y2, label)
+                    _dibujar_marca(frame, x1, y1, x2, label)
 
         # Save image if vehicle detected and cooldown period passed
         now = time.time()

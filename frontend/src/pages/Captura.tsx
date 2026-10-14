@@ -93,9 +93,12 @@ const Captura: React.FC = () => {
       const response = await api.get<CameraDevice[]>('/captura/dispositivos', {
         params: refrescar ? { refrescar: true } : undefined,
       });
+      // Los nombres solo se usan cuando su cantidad coincide con la del backend:
+      // de lo contrario no hay forma fiable de saber qué nombre va con qué índice.
+      const usarNombres = nombres.length === (response.data || []).length;
       const devices = (response.data || []).map((cam, i) => ({
         ...cam,
-        label: nombres[i]?.trim() || cam.label,
+        label: (usarNombres && nombres[i]?.trim()) || cam.label,
       }));
       if (DEBUG_CAMARAS) console.info('[camaras] backend:', response.data, '| nombres:', nombres);
       setCameras(devices);
