@@ -259,22 +259,29 @@ class ImagenUpdate(BaseModel):
 
 @router.post("/analizar-todas-hoy", response_model=BulkAnalysisResult)
 async def analizar_todas_imagenes_hoy(
+    reanalizar: bool = False,
     current_user: Usuario = Depends(require_internal_user),
         db: Session = Depends(get_db)
 ):
+    """Revisa las imágenes de hoy. Omite las ya revisadas salvo que se pida reanalizar."""
+    from services.cnn_queue import MARCA_REVISADA
+
     today = date.today()
     start_of_day = datetime.combine(today, datetime.min.time())
 
-    images_with_predictions = db.query(Imagen).join(Prediccion).filter(
-        Imagen.fecha_subida >= start_of_day
-    ).all()
+    consulta = db.query(Imagen).join(Prediccion).filter(Imagen.fecha_subida >= start_of_day)
+    if not reanalizar:
+        consulta = consulta.filter(
+            (Prediccion.observacion.is_(None)) | (Prediccion.observacion != MARCA_REVISADA)
+        )
+    images_with_predictions = consulta.all()
 
     if not images_with_predictions:
         return BulkAnalysisResult(
             processed_count=0,
             success_count=0,
             failed_count=0,
-            errors=["No hay imágenes para analizar hoy"]
+            errors=["No hay imágenes nuevas para analizar hoy"]
         )
 
     processed_count = 0
@@ -296,8 +303,9 @@ async def analizar_todas_imagenes_hoy(
             prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
             prediccion.confianza = resultado["nivel_confianza"] / 100.0
             prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
-            prediccion.observacion = "-"
+            prediccion.observacion = MARCA_REVISADA
             prediccion.fecha_prediccion = func.now()
+            db.commit()  # Se guarda una por una: un fallo posterior no deshace lo ya revisado
 
             success_count += 1
 

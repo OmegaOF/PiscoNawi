@@ -277,8 +277,7 @@ def _run_post_processing_analysis(db: Session, reanalizar: bool = False):
                 prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
                 prediccion.observacion = MARCA_REVISADA
                 prediccion.fecha_prediccion = func.now()
-
-
+                db.commit()  # Se guarda una por una: un fallo posterior no deshace lo ya revisado
 
             except Exception as e:
                 logger.debug("no se pudo completar el análisis de una imagen")
