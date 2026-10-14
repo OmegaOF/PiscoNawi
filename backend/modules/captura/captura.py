@@ -103,6 +103,16 @@ class _SinSalidaNativa:
         return False
 
 
+def _entrega_imagen(cap, intentos: int = 5) -> bool:
+    """Algunas cámaras tardan unos milisegundos en entregar el primer cuadro."""
+    for _ in range(intentos):
+        leyo, frame = cap.read()
+        if leyo and frame is not None:
+            return True
+        time.sleep(0.05)
+    return False
+
+
 def _abrir_camara(index: int):
     """Abre la cámara del índice indicado. Devuelve el objeto VideoCapture o None si falla."""
     try:
@@ -219,22 +229,17 @@ class CaptureStatus(BaseModel):
 
 
 def _sondear_camaras() -> List[CameraDevice]:
-    """Busca cámaras disponibles abriéndolas una vez. Operación costosa: su resultado se cachea."""
+    """Busca cámaras disponibles. Operación costosa: su resultado se cachea."""
     devices: List[CameraDevice] = []
-    fallos = 0
     with _SinSalidaNativa():
         for i in range(MAX_CAMARAS):
             cap = _abrir_camara(i)
             if cap is None:
-                fallos += 1
-                if fallos >= FALLOS_SEGUIDOS_CORTE and devices:
-                    break
                 continue
-            fallos = 0
-            leyo, _ = cap.read()  # Confirma que la cámara entrega imagen, no solo que abre
+            entrega = _entrega_imagen(cap)
             cap.release()
-            if leyo:
-                devices.append(CameraDevice(index=i, label=f"Cámara {i}", available=True))
+            devices.append(CameraDevice(index=i, label=f"Cámara {i}", available=entrega))
+    logger.debug("cámaras detectadas: %s", [(d.index, d.available) for d in devices])
     return devices
 
 

@@ -225,6 +225,7 @@ const Captura: React.FC = () => {
                 {cameras.map((cam) => (
                   <option key={cam.index} value={cam.index}>
                     {cam.label}
+                    {!cam.available ? ' (en uso o sin señal)' : ''}
                   </option>
                 ))}
               </select>
@@ -257,6 +258,12 @@ const Captura: React.FC = () => {
               {loading ? 'Deteniendo...' : 'Detener Captura'}
             </button>
           </div>
+
+          {cameras.some((c) => !c.available) && (
+            <p className="mb-2 text-sm text-amber-700">
+              Alguna cámara está ocupada por otro programa (o por otra pestaña del navegador). Ciérralo y pulsa «Buscar cámaras».
+            </p>
+          )}
 
           {error && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
