@@ -89,22 +89,51 @@ def _backend_video() -> int:
 
 
 class _SinSalidaNativa:
-    """Silencia los mensajes que las librerías nativas escriben directo en la consola."""
+    """Silencia los mensajes que las librerías nativas escriben en la consola.
+
+    Si el sistema no permite redirigir los descriptores, no interrumpe el proceso:
+    simplemente no silencia nada.
+    """
 
     def __enter__(self):
-        self._nulo = os.open(os.devnull, os.O_RDWR)
-        self._copias = (os.dup(1), os.dup(2))
-        os.dup2(self._nulo, 1)
-        os.dup2(self._nulo, 2)
+        self._copias = None
+        self._nulo = None
+        try:
+            self._nulo = os.open(os.devnull, os.O_RDWR)
+            self._copias = (os.dup(1), os.dup(2))
+            os.dup2(self._nulo, 1)
+            os.dup2(self._nulo, 2)
+        except Exception:
+            self._restaurar()
         return self
 
+    def _restaurar(self):
+        if self._copias:
+            try:
+                os.dup2(self._copias[0], 1)
+                os.dup2(self._copias[1], 2)
+            except Exception:
+                pass
+            for fd in self._copias:
+                try:
+                    os.close(fd)
+                except Exception:
+                    pass
+            self._copias = None
+        if self._nulo is not None:
+            try:
+                os.close(self._nulo)
+            except Exception:
+                pass
+            self._nulo = None
+
     def __exit__(self, *exc):
-        sys.stdout.flush()
-        sys.stderr.flush()
-        os.dup2(self._copias[0], 1)
-        os.dup2(self._copias[1], 2)
-        for fd in (*self._copias, self._nulo):
-            os.close(fd)
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:
+            pass
+        self._restaurar()
         return False
 
 
@@ -235,6 +264,13 @@ class CaptureStatus(BaseModel):
 
 def _probar_indice(i: int):
     """Devuelve (dispositivo o None, detalle para el registro)."""
+    try:
+        return _probar_indice_inner(i)
+    except Exception as e:
+        return None, f"cámara {i}: error inesperado ({type(e).__name__}: {e})"
+
+
+def _probar_indice_inner(i: int):
     inicio = time.time()
     cap = _abrir_camara(i)
     if cap is None:
@@ -275,8 +311,12 @@ async def listar_dispositivos(
         logger.debug("dispositivos: %s desde caché", len(_camaras_cache))
         return _camaras_cache
 
-    _camaras_cache = await run_in_threadpool(_sondear_camaras)
-    _camaras_cache_ts = time.time()
+    try:
+        _camaras_cache = await run_in_threadpool(_sondear_camaras)
+        _camaras_cache_ts = time.time()
+    except Exception:
+        logger.warning("no se pudo sondear las cámaras", exc_info=True)
+        return _camaras_cache  # se devuelve lo último conocido en vez de fallar
     logger.debug("dispositivos: se devuelven %s", len(_camaras_cache))
     return _camaras_cache
 

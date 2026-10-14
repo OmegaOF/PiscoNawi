@@ -47,6 +47,7 @@ const Captura: React.FC = () => {
     }, 3000); // Refresh every 3 seconds when running
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status.is_running]);
 
   const checkStatus = async () => {
