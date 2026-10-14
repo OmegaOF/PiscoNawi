@@ -1,15 +1,26 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 import os
+
+os.environ.setdefault("OPENCV_LOG_LEVEL", "FATAL")
+os.environ.setdefault("OPENCV_VIDEOIO_PRIORITY_MSMF", "0")
+
+import sys
 from services.registro import logger
 from datetime import datetime
 import glob
 import threading
 import cv2
+try:
+    cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
+except Exception:
+    pass
 import time
 from typing import Optional
 from ultralytics import YOLO
 from pydantic import BaseModel
+
+from starlette.concurrency import run_in_threadpool
 
 from modules.roles.roles import require_internal_user
 from db import Usuario
@@ -21,7 +32,11 @@ capture_process = None
 capture_thread = None
 camera_active = False
 camera_index = int(os.getenv("CAMERA_INDEX", "0"))  # Índice de cámara por defecto
-MAX_CAMARAS = int(os.getenv("MAX_CAMARAS", "4"))  # Cuántos índices probar al listar dispositivos
+MAX_CAMARAS = int(os.getenv("MAX_CAMARAS", "6"))  # Cuántos índices probar al listar dispositivos
+FALLOS_SEGUIDOS_CORTE = 2  # Al sondear, detenerse tras N índices seguidos sin cámara
+CACHE_CAMARAS_SEG = int(os.getenv("CACHE_CAMARAS_SEG", "300"))  # Vigencia del listado en memoria
+_camaras_cache: List["CameraDevice"] = []
+_camaras_cache_ts = 0.0
 CAPTURA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..", "storage", "capturas")  # Directory for YOLO captures
 CAPTURA_DIR = os.path.normpath(CAPTURA_DIR)
 
@@ -54,9 +69,46 @@ class IniciarCapturaRequest(BaseModel):
     camera_index: Optional[int] = None
 
 
+def _backend_video() -> int:
+    """Elige el sistema de captura adecuado para cada sistema operativo."""
+    forzado = os.getenv("VIDEO_BACKEND", "").strip().upper()
+    if forzado:
+        return getattr(cv2, f"CAP_{forzado}", cv2.CAP_ANY)
+    if sys.platform.startswith("win"):
+        return cv2.CAP_DSHOW      # DirectShow: evita los fallos de MSMF
+    if sys.platform == "darwin":
+        return cv2.CAP_AVFOUNDATION
+    if sys.platform.startswith("linux"):
+        return cv2.CAP_V4L2
+    return cv2.CAP_ANY
+
+
+class _SinSalidaNativa:
+    """Silencia los mensajes que las librerías nativas escriben directo en la consola."""
+
+    def __enter__(self):
+        self._nulo = os.open(os.devnull, os.O_RDWR)
+        self._copias = (os.dup(1), os.dup(2))
+        os.dup2(self._nulo, 1)
+        os.dup2(self._nulo, 2)
+        return self
+
+    def __exit__(self, *exc):
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(self._copias[0], 1)
+        os.dup2(self._copias[1], 2)
+        for fd in (*self._copias, self._nulo):
+            os.close(fd)
+        return False
+
+
 def _abrir_camara(index: int):
     """Abre la cámara del índice indicado. Devuelve el objeto VideoCapture o None si falla."""
-    cap = cv2.VideoCapture(index)
+    try:
+        cap = cv2.VideoCapture(index, _backend_video())
+    except Exception:
+        return None
     if not cap.isOpened():
         cap.release()
         return None
@@ -166,21 +218,44 @@ class CaptureStatus(BaseModel):
     camera_index: Optional[int] = None
 
 
-@router.get("/dispositivos", response_model=List[CameraDevice])
-async def listar_dispositivos(current_user: Usuario = Depends(require_internal_user)):
-    global camera_active, camera_index
+def _sondear_camaras() -> List[CameraDevice]:
+    """Busca cámaras disponibles abriéndolas una vez. Operación costosa: su resultado se cachea."""
+    devices: List[CameraDevice] = []
+    fallos = 0
+    with _SinSalidaNativa():
+        for i in range(MAX_CAMARAS):
+            cap = _abrir_camara(i)
+            if cap is None:
+                fallos += 1
+                if fallos >= FALLOS_SEGUIDOS_CORTE and devices:
+                    break
+                continue
+            fallos = 0
+            leyo, _ = cap.read()  # Confirma que la cámara entrega imagen, no solo que abre
+            cap.release()
+            if leyo:
+                devices.append(CameraDevice(index=i, label=f"Cámara {i}", available=True))
+    return devices
 
-    # Con la captura activa no se sondean otras cámaras para no robar el dispositivo en uso.
+
+@router.get("/dispositivos", response_model=List[CameraDevice])
+async def listar_dispositivos(
+    refrescar: bool = False,
+    current_user: Usuario = Depends(require_internal_user),
+):
+    global _camaras_cache, _camaras_cache_ts
+
+    # Con la captura activa no se sondean otras cámaras para no quitar la que está en uso.
     if camera_active:
         return [CameraDevice(index=camera_index, label=f"Cámara {camera_index}", available=True)]
 
-    devices = []
-    for i in range(MAX_CAMARAS):
-        cap = _abrir_camara(i)
-        if cap is not None:
-            devices.append(CameraDevice(index=i, label=f"Cámara {i}", available=True))
-            cap.release()
-    return devices
+    vigente = _camaras_cache and (time.time() - _camaras_cache_ts) < CACHE_CAMARAS_SEG
+    if vigente and not refrescar:
+        return _camaras_cache
+
+    _camaras_cache = await run_in_threadpool(_sondear_camaras)
+    _camaras_cache_ts = time.time()
+    return _camaras_cache
 
 
 @router.post("/iniciar", response_model=CaptureStatus)

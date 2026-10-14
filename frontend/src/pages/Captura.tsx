@@ -29,6 +29,7 @@ const Captura: React.FC = () => {
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [preview, setPreview] = useState<number | null>(null);
+  const [buscandoCamaras, setBuscandoCamaras] = useState(false);
 
   useEffect(() => {
     checkStatus();
@@ -53,15 +54,43 @@ const Captura: React.FC = () => {
     }
   };
 
-  const loadCameras = async () => {
+  // El navegador conoce el nombre real de cada cámara; el backend solo su índice.
+  const nombresDelNavegador = async (): Promise<string[]> => {
     try {
-      const response = await api.get('/captura/dispositivos');
-      const devices: CameraDevice[] = response.data;
+      if (!navigator.mediaDevices?.enumerateDevices) return [];
+      let dispositivos = await navigator.mediaDevices.enumerateDevices();
+      let camaras = dispositivos.filter((d) => d.kind === 'videoinput');
+      // Sin permiso concedido las etiquetas llegan vacías: se pide una vez y se vuelve a leer.
+      if (camaras.length > 0 && camaras.every((d) => !d.label)) {
+        const permiso = await navigator.mediaDevices.getUserMedia({ video: true });
+        permiso.getTracks().forEach((t) => t.stop());
+        dispositivos = await navigator.mediaDevices.enumerateDevices();
+        camaras = dispositivos.filter((d) => d.kind === 'videoinput');
+      }
+      return camaras.map((d) => d.label);
+    } catch {
+      return [];
+    }
+  };
+
+  const loadCameras = async (refrescar = false) => {
+    setBuscandoCamaras(true);
+    try {
+      const [response, nombres] = await Promise.all([
+        api.get<CameraDevice[]>('/captura/dispositivos', { params: refrescar ? { refrescar: true } : undefined }),
+        nombresDelNavegador(),
+      ]);
+      const devices = response.data.map((cam, i) => ({
+        ...cam,
+        label: nombres[i]?.trim() || cam.label,
+      }));
       setCameras(devices);
       if (devices.length > 0) {
         setSelectedCamera((prev) => (devices.some((d) => d.index === prev) ? prev : devices[0].index));
       }
     } catch (err) {
+    } finally {
+      setBuscandoCamaras(false);
     }
   };
 
@@ -185,25 +214,29 @@ const Captura: React.FC = () => {
                 id="camera-select"
                 value={selectedCamera}
                 onChange={(e) => setSelectedCamera(Number(e.target.value))}
-                disabled={status.is_running || loading}
+                disabled={status.is_running || loading || buscandoCamaras}
                 className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {cameras.length === 0 && <option value={selectedCamera}>No se detectaron cámaras</option>}
+                {cameras.length === 0 && (
+                  <option value={selectedCamera}>
+                    {buscandoCamaras ? 'Buscando cámaras…' : 'No se detectaron cámaras'}
+                  </option>
+                )}
                 {cameras.map((cam) => (
                   <option key={cam.index} value={cam.index}>
-                    {cam.label} (índice {cam.index})
+                    {cam.label}
                   </option>
                 ))}
               </select>
             </div>
             <button
               type="button"
-              onClick={loadCameras}
-              disabled={status.is_running || loading}
+              onClick={() => loadCameras(true)}
+              disabled={status.is_running || loading || buscandoCamaras}
               className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Volver a buscar cámaras disponibles"
             >
-              Buscar cámaras
+              {buscandoCamaras ? 'Buscando…' : 'Buscar cámaras'}
             </button>
           </div>
 
