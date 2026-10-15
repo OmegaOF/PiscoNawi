@@ -59,6 +59,10 @@ from seed_demo import (
     FRANJA_MIN,
     HORA_PESO_MEDIA,
     HORA_SMOG_DELTA,
+    VENTANA_CRITICA,
+    VENTANA_CRITICA_VOLUMEN,
+    VENTANA_LIMPIA,
+    VENTANA_LIMPIA_VOLUMEN,
     MES_SMOG_DELTA,
     USUARIOS_PESO,
     VOLUMEN_FINAL,
@@ -108,15 +112,15 @@ ZONAS = [
 # Naranjas (15-30 %): Av. América, Sacaba, Colcapirhua, Cala Cala.
 # Verdes (<=15 %): Manuela Ferrufino, Tiquipaya.
 PERFIL_ZONAS = {
-    "Calle Manuela Ferrufino, 6 de Agosto, Canata, Cochabamba, Cercado, Cochabamba, Bolivia": (0.17, 0.04, "Cámara Calle Manuela Ferrufino"),
-    "Av. América": (0.17, 0.16, "Cámara Av. América"),
+    "Calle Manuela Ferrufino, 6 de Agosto, Canata, Cochabamba, Cercado, Cochabamba, Bolivia": (0.17, 0.03, "Cámara Calle Manuela Ferrufino"),
+    "Av. América": (0.17, 0.14, "Cámara Av. América"),
     "Quillacollo Centro": (0.09, 0.45, "Cámara Quillacollo Centro"),
-    "Sacaba Plaza": (0.11, 0.24, "Cámara Sacaba"),
+    "Sacaba Plaza": (0.11, 0.20, "Cámara Sacaba"),
     "Tiquipaya Centro": (0.12, 0.03, "Cámara Tiquipaya"),
-    "Colcapirhua Zona Sur": (0.09, 0.15, "Cámara Colcapirhua Zona Sur"),
+    "Colcapirhua Zona Sur": (0.09, 0.13, "Cámara Colcapirhua Zona Sur"),
     "Centro Heroínas Ayacucho, Cercado": (0.08, 0.36, "Cámara Heroínas y Ayacucho"),
     "Av. Blanco Galindo Km 4, Cercado": (0.08, 0.31, "Cámara Av. Blanco Galindo"),
-    "Cala Cala, Cercado": (0.09, 0.18, "Cámara Cala Cala"),
+    "Cala Cala, Cercado": (0.09, 0.15, "Cámara Cala Cala"),
 }
 NOMBRE_CORTO = {direccion: corto for corto, direccion, _, _, _ in ZONAS}
 
@@ -136,6 +140,8 @@ SPEC_CAMARA = dict(
 )
 
 PROB_PLACA = 0.30
+# Probabilidad mínima de smog fuera de la ventana limpia del domingo.
+PROB_SMOG_MINIMA = 0.01
 VENTANA_SIN_REPETIR = 20  # una imagen no reaparece hasta pasar N registros de su misma clase
 N_PLACAS_FRECUENTES, N_PLACAS_OCASIONALES, N_PLACAS_SUCIAS = 15, 45, 5
 
@@ -332,11 +338,19 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
     registros: List[dict] = []
 
     for i, dia in enumerate(elegidos):
-        franja = rng.choices(range(len(HORA_PESO_MEDIA)), HORA_PESO_MEDIA)[0]
+        pesos_franja = HORA_PESO_MEDIA
+        refuerzo = VENTANA_LIMPIA_VOLUMEN if dia.weekday() == 6 else VENTANA_CRITICA_VOLUMEN
+        if any(d == dia.weekday() for d, _ in refuerzo):
+            pesos_franja = [
+                w * refuerzo.get((dia.weekday(), (f * FRANJA_MIN) // 60), 1.0)
+                for f, w in enumerate(HORA_PESO_MEDIA)
+            ]
+        franja = rng.choices(range(len(HORA_PESO_MEDIA)), pesos_franja)[0]
         hora, minuto = divmod(franja * FRANJA_MIN + rng.randint(0, FRANJA_MIN - 1), 60)
         ts = datetime.combine(dia, time(hora, minuto, rng.randint(0, 59)))
         if ts > ahora:
             ts -= timedelta(days=1)
+        hora = ts.hour
         clave = rng.choices(claves, pesos)[0]
         _, base, _ = PERFIL_ZONAS[clave]
         disp_id = disp_por_zona.get(clave)
@@ -351,9 +365,20 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
             + MES_SMOG_DELTA.get(ts.month, 0) * 0.6
             + rng.gauss(0, 0.03)
         )
-        if placa in sucias:
-            prob = 0.45
-        es_smog = rng.random() < min(max(prob, 0.01), 0.95)
+        clave_hora = (ts.weekday(), hora)
+        factor_limpio = VENTANA_LIMPIA.get(clave_hora, 1.0)
+        prob_critica = VENTANA_CRITICA.get(clave_hora)
+        if factor_limpio < 1.0:
+            # Ventana limpia del domingo: sin piso, para que sea el mínimo claro de la semana.
+            prob = min(prob * factor_limpio, 0.95)
+        elif prob_critica is not None:
+            # Ventana crítica del miércoles por la tarde: máximo claro de la semana.
+            prob = min(prob * prob_critica, 0.95)
+        else:
+            if placa in sucias:
+                prob = 0.45
+            prob = min(max(prob, PROB_SMOG_MINIMA), 0.95)
+        es_smog = rng.random() < prob
 
         clase = "smog" if es_smog else "sin_smog"
         # El sistema es binario: el único número es la confianza de la predicción.

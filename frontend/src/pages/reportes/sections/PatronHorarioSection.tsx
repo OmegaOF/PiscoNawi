@@ -11,7 +11,9 @@ import { DIAS_LARGOS, fmtHora, fmtInt, fmtPct } from '../../../lib/format';
 import { HeatCell } from '../../../lib/reportsApi';
 import { cx } from '../../../lib/cx';
 
-const MIN = 3;
+// Muestra mínima para declarar una franja "más crítica" o "más limpia":
+// con 3 o 4 registros un 0 % es ruido, no una señal.
+const MIN = 8;
 
 const PatronHorarioSection: React.FC<SectionProps> = ({ data }) => {
   const ctx = useChartCtx();
@@ -36,6 +38,7 @@ const PatronHorarioSection: React.FC<SectionProps> = ({ data }) => {
     });
     return {
       pico: pick((a, b) => a.pct_smog > b.pct_smog || (a.pct_smog === b.pct_smog && a.total > b.total)),
+      // Ante varias franjas igual de limpias gana la que tiene más registros: más evidencia.
       limpia: pick((a, b) => a.pct_smog < b.pct_smog || (a.pct_smog === b.pct_smog && a.total > b.total)),
       horaPico: hp as { hora: number; t: number } | null,
     };

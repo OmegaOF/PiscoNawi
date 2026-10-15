@@ -85,10 +85,25 @@ HORA_PESO_MEDIA = [
 ]
 # Compatibilidad: peso por hora entera (suma de sus dos medias horas).
 HORA_PESO = [HORA_PESO_MEDIA[2 * h] + HORA_PESO_MEDIA[2 * h + 1] for h in range(24)]
-HORA_SMOG_DELTA = {7: .15, 8: .15, 9: .12, 17: .15, 18: .15, 19: .12, 12: .05, 13: .05, 14: .04,
+HORA_SMOG_DELTA = {7: .15, 8: .15, 9: .12, 17: .18, 18: .20, 19: .18, 12: .05, 13: .05, 14: .04,
                    0: -.10, 1: -.10, 2: -.10, 3: -.10, 4: -.10, 5: -.05, 10: -.04, 11: -.04}
 DIA_PESO = [1.0, 1.0, 1.0, 1.0, 1.1, 0.6, 0.35]  # lunes..domingo
 DIA_SMOG_DELTA = {5: -0.05, 6: -0.07}
+# Ventana más limpia de la semana: domingo por la tarde (mínimo a las 15:00).
+# Clave (dia_semana 0=lunes, hora) -> factor que multiplica la probabilidad de smog.
+VENTANA_LIMPIA = {(6, 13): 0.25, (6, 14): 0.10, (6, 15): 0.04, (6, 16): 0.10, (6, 17): 0.30}
+# Se refuerza el volumen del domingo en esa franja para que la celda tenga muestras suficientes
+# y el "momento más limpio" no lo decida el azar de una celda con 3 registros.
+VENTANA_LIMPIA_VOLUMEN = {(6, 13): 6.0, (6, 14): 12.0, (6, 15): 26.0, (6, 16): 12.0, (6, 17): 6.0}
+# Probabilidad mínima de smog fuera de la ventana limpia: mantiene las demás franjas
+# por encima de cero para que el "momento más limpio" no lo decida el azar.
+PROB_SMOG_MINIMA = 0.01
+# Ventana más crítica de la semana: miércoles al final de la tarde (pico a las 18:00).
+# Clave (dia_semana 0=lunes, hora) -> factor que multiplica la probabilidad de smog de la zona,
+# de modo que las zonas limpias siguen siendo las menos contaminadas también en esa franja.
+VENTANA_CRITICA = {(2, 17): 1.8, (2, 18): 3.0, (2, 19): 1.8}
+# Volumen reforzado para que la franja tenga muestra suficiente y el porcentaje sea estable.
+VENTANA_CRITICA_VOLUMEN = {(2, 17): 3.0, (2, 18): 7.0, (2, 19): 3.0}
 MES_SMOG_DELTA = {4: -.05, 5: -.02, 6: .02, 7: .06, 8: .08, 9: .05, 10: .0}  # estación seca peor
 VOLUMEN_INICIAL, VOLUMEN_FINAL = 0.8, 1.2
 CONFIANZA_MIN, CONFIANZA_MAX = 0.60, 0.97
@@ -233,11 +248,19 @@ def run_seed(
     min_ts = max_ts = None
 
     for i, dia in enumerate(dias):
-        franja = rng.choices(range(len(HORA_PESO_MEDIA)), HORA_PESO_MEDIA)[0]
+        pesos_franja = HORA_PESO_MEDIA
+        refuerzo = VENTANA_LIMPIA_VOLUMEN if dia.weekday() == 6 else VENTANA_CRITICA_VOLUMEN
+        if any(d == dia.weekday() for d, _ in refuerzo):
+            pesos_franja = [
+                w * refuerzo.get((dia.weekday(), (f * FRANJA_MIN) // 60), 1.0)
+                for f, w in enumerate(HORA_PESO_MEDIA)
+            ]
+        franja = rng.choices(range(len(HORA_PESO_MEDIA)), pesos_franja)[0]
         hora, minuto = divmod(franja * FRANJA_MIN + rng.randint(0, FRANJA_MIN - 1), 60)
         ts = datetime.combine(dia, time(hora, minuto, rng.randint(0, 59)))
         if ts > ahora:
             ts -= timedelta(days=1)
+        hora = ts.hour
 
         ub_id = rng.choices(zone_ids, zone_weights)[0]
         disp_id = ZONAS[ub_id][2] if ZONAS[ub_id][2] in dispositivos else activo_default
@@ -254,9 +277,17 @@ def run_seed(
             + MES_SMOG_DELTA.get(ts.month, 0)
             + rng.gauss(0, 0.03)
         )
-        if placa in placas_sucias:
-            prob = 0.85
-        prob = min(max(prob, 0.05), 0.95)
+        clave_hora = (ts.weekday(), hora)
+        factor_limpio = VENTANA_LIMPIA.get(clave_hora, 1.0)
+        prob_critica = VENTANA_CRITICA.get(clave_hora)
+        if factor_limpio < 1.0:
+            prob = min(prob * factor_limpio, 0.95)
+        elif prob_critica is not None:
+            prob = min(prob * prob_critica, 0.95)
+        else:
+            if placa in placas_sucias:
+                prob = 0.85
+            prob = min(max(prob, PROB_SMOG_MINIMA), 0.95)
         es_smog = rng.random() < prob
 
         clase = "smog" if es_smog else "sin_smog"
