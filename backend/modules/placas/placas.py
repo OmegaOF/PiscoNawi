@@ -24,8 +24,8 @@ PLACA_MAX = 20
 ESTADO_PATTERN = "^(sin_placa|con_placa|todas)$"
 CLASE_PATTERN = "^(smog|sin_smog|todas)$"
 ORDEN = {
-    "p_smog": (Prediccion.p_smog.desc(), Prediccion.id.desc()),
     "fecha": (Prediccion.fecha_prediccion.desc(), Prediccion.id.desc()),
+    "confianza": (Prediccion.confianza.desc(), Prediccion.id.desc()),
 }
 _PLACA_VACIA = or_(Imagen.placa_manual.is_(None), func.trim(Imagen.placa_manual) == "")
 _PLACA_PRESENTE = and_(Imagen.placa_manual.isnot(None), func.trim(Imagen.placa_manual) != "")
@@ -39,7 +39,6 @@ class VehiculoPlacaItem(BaseModel):
     filename_original: str
     placa_manual: Optional[str] = None
     clase_predicha: Optional[str] = None
-    p_smog: float = 0.0
     confianza: float = 0.0
     fecha_prediccion: Optional[str] = None
     ubicacion_id: Optional[int] = None
@@ -110,7 +109,6 @@ _COLS = (
     DispositivoCaptura.nombre_dispositivo,
     Usuario.nombre.label("usuario_nombre"),
     Prediccion.clase_predicha,
-    Prediccion.p_smog,
     Prediccion.confianza,
     Prediccion.fecha_prediccion,
     Prediccion.observacion,
@@ -152,7 +150,6 @@ def _to_item(r) -> VehiculoPlacaItem:
         filename_original=r.filename_original,
         placa_manual=r.placa_manual,
         clase_predicha=r.clase_predicha,
-        p_smog=round(float(r.p_smog or 0), 4),
         confianza=round(float(r.confianza or 0), 4),
         fecha_prediccion=_fmt_dt(r.fecha_prediccion),
         ubicacion_id=r.ubicacion_id,
@@ -191,14 +188,14 @@ async def listar_vehiculos(
     estado: str = Query("sin_placa", pattern=ESTADO_PATTERN),
     clase: str = Query("smog", pattern=CLASE_PATTERN),
     q: Optional[str] = Query(None, max_length=20),
-    orden: str = Query("p_smog", pattern="^(p_smog|fecha)$"),
+    orden: str = Query("fecha", pattern="^(fecha|confianza)$"),
     page: int = Query(1, ge=1),
     size: int = Query(24, ge=1, le=100),
     f: ReportFilters = Depends(report_filters),
     user: Usuario = Depends(_require),
     db: Session = Depends(get_db),
 ):
-    """Vehículos para registrar placa. Por defecto: con smog y sin placa, mayor p_smog primero."""
+    """Vehículos para registrar placa. Por defecto: con smog y sin placa, más recientes primero."""
     base = _aplicar_estado_q(_base(db, f, clase), estado, normalizar_placa(q))
     total = base.order_by(None).count()
     rows = base.order_by(*ORDEN[orden]).offset((page - 1) * size).limit(size).all()

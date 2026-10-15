@@ -8,12 +8,15 @@ Estructura esperada (no se sube a git):
 Qué hace:
   1. Copia las imágenes (reducidas a 1600 px, JPEG) a storage/capturas/prueba/<carpeta>/
      para que el backend las sirva en http://localhost:8000/capturas/prueba/...
-  2. Crea (si no existen) 3 zonas nuevas, entre ellas "Centro Heroínas Ayacucho" con smog alto.
+  2. Crea (si faltan) el catálogo geográfico completo: país, provincias, ciudades,
+     las 9 zonas de captura y una cámara por zona. El script es autocontenido:
+     funciona en una base vacía sin cargar catálogos a mano.
   3. Borra los registros demo/prueba anteriores (nunca toca registros reales).
   4. Crea ~800 registros (imagen + predicción) en los últimos 6 meses, con horas pico,
      días hábiles, varios dispositivos y operadores. Las placas quedan vacías
      (se registran a mano en "Registro de placas"); usa --con-placas para rellenarlas.
-     Proporción aproximada: 1 vehículo con smog por cada 3 sin smog.
+     Resultado esperado: 3 zonas en rojo (>30 % con smog), 4 en naranja (15-30 %)
+     y 2 en verde (<=15 %); global alrededor del 20 %.
      Las imágenes se reparten al azar sin repetirse el mismo día ni de forma consecutiva.
 
 Uso (desde la carpeta backend/, con el entorno virtual activo):
@@ -40,6 +43,8 @@ from PIL import Image as PILImage, ImageOps
 from db import (
     Ciudad,
     DispositivoCaptura,
+    Pais,
+    Provincia,
     Imagen,
     Prediccion,
     SessionLocal,
@@ -51,7 +56,8 @@ from db import (
 from seed_demo import (
     DIA_PESO,
     DIA_SMOG_DELTA,
-    HORA_PESO,
+    FRANJA_MIN,
+    HORA_PESO_MEDIA,
     HORA_SMOG_DELTA,
     MES_SMOG_DELTA,
     USUARIOS_PESO,
@@ -73,26 +79,50 @@ LADO_MAX = 1600
 
 PREFIJO = "prueba_"
 
-# Zonas nuevas: (direccion, departamento, latitud, longitud)
-ZONAS_NUEVAS = [
-    ("Centro Heroínas Ayacucho, Cercado", "Cochabamba", -17.39195, -66.15870),
-    ("Av. Blanco Galindo Km 4, Cercado", "Cochabamba", -17.38960, -66.19650),
-    ("Cala Cala, Cercado", "Cochabamba", -17.37320, -66.15890),
+# Catálogo geográfico base (se crea si la base está vacía).
+PAIS = "Bolivia"
+CIUDADES = [
+    # (nombre ciudad, provincia, latitud, longitud)
+    ("Cochabamba", "Cercado", -17.38950, -66.15680),
+    ("Quillacollo", "Quillacollo", -17.39200, -66.27800),
+    ("Sacaba", "Sacaba", -17.39700, -66.03800),
+    ("Tiquipaya", "Tiquipaya", -17.33800, -66.21500),
+    ("Colcapirhua", "Colcapirhua", -17.38000, -66.24500),
 ]
 
-# Perfil por zona: clave -> (peso_volumen, prob_smog_base, dispositivo_id)
-# Claves 1..6 = ubicaciones existentes; las nuevas se identifican por su dirección.
+# Zonas de captura: (nombre corto, direccion, departamento, latitud, longitud)
+ZONAS = [
+    ("Calle Manuela Ferrufino", "Calle Manuela Ferrufino, 6 de Agosto, Canata, Cochabamba, Cercado, Cochabamba, Bolivia", "Cochabamba", -17.41573, -66.15749),
+    ("Av. América", "Av. América", "Cochabamba", -17.39350, -66.15700),
+    ("Quillacollo Centro", "Quillacollo Centro", "Cochabamba", -17.39200, -66.27800),
+    ("Sacaba Plaza", "Sacaba Plaza", "Cochabamba", -17.39700, -66.03800),
+    ("Tiquipaya Centro", "Tiquipaya Centro", "Cochabamba", -17.33800, -66.21500),
+    ("Colcapirhua Zona Sur", "Colcapirhua Zona Sur", "Cochabamba", -17.38000, -66.24500),
+    ("Centro Heroínas Ayacucho", "Centro Heroínas Ayacucho, Cercado", "Cochabamba", -17.39195, -66.15870),
+    ("Av. Blanco Galindo", "Av. Blanco Galindo Km 4, Cercado", "Cochabamba", -17.38960, -66.19650),
+    ("Cala Cala", "Cala Cala, Cercado", "Cochabamba", -17.37320, -66.15890),
+]
+
+# Perfil por zona (clave = dirección): (peso_volumen, prob_smog_base, nombre de la cámara)
+# Rojas (>30 % con smog): Quillacollo, Heroínas, Blanco Galindo.
+# Naranjas (15-30 %): Av. América, Sacaba, Colcapirhua, Cala Cala.
+# Verdes (<=15 %): Manuela Ferrufino, Tiquipaya.
 PERFIL_ZONAS = {
-    1: (0.17, 0.04, "Cámara Calle Manuela Ferrufino"),
-    2: (0.17, 0.03, "Cámara Av. América"),
-    3: (0.08, 0.84, "Cámara Quillacollo Centro"),  # smog ALTO
-    4: (0.11, 0.04, "Cámara Sacaba"),
-    5: (0.12, 0.01, "Cámara Tiquipaya"),  # zona limpia
-    6: (0.09, 0.02, "Cámara Colcapirhua Zona Sur"),
-    "Centro Heroínas Ayacucho, Cercado": (0.08, 0.67, "Cámara Heroínas y Ayacucho"),  # smog ALTO
-    "Av. Blanco Galindo Km 4, Cercado": (0.08, 0.38, "Cámara Av. Blanco Galindo"),
-    "Cala Cala, Cercado": (0.08, 0.46, "Cámara Cala Cala"),
+    "Calle Manuela Ferrufino, 6 de Agosto, Canata, Cochabamba, Cercado, Cochabamba, Bolivia": (0.17, 0.04, "Cámara Calle Manuela Ferrufino"),
+    "Av. América": (0.17, 0.16, "Cámara Av. América"),
+    "Quillacollo Centro": (0.09, 0.45, "Cámara Quillacollo Centro"),
+    "Sacaba Plaza": (0.11, 0.24, "Cámara Sacaba"),
+    "Tiquipaya Centro": (0.12, 0.03, "Cámara Tiquipaya"),
+    "Colcapirhua Zona Sur": (0.09, 0.15, "Cámara Colcapirhua Zona Sur"),
+    "Centro Heroínas Ayacucho, Cercado": (0.08, 0.36, "Cámara Heroínas y Ayacucho"),
+    "Av. Blanco Galindo Km 4, Cercado": (0.08, 0.31, "Cámara Av. Blanco Galindo"),
+    "Cala Cala, Cercado": (0.09, 0.18, "Cámara Cala Cala"),
 }
+NOMBRE_CORTO = {direccion: corto for corto, direccion, _, _, _ in ZONAS}
+
+# Confianza del análisis (misma escala para ambas clases)
+CONFIANZA_MIN, CONFIANZA_MAX = 0.60, 0.97
+
 # Una cámara por lugar: el tercer valor es el nombre del dispositivo que captura en esa zona.
 # Si no existe en la base, se crea con estas especificaciones.
 SPEC_CAMARA = dict(
@@ -146,15 +176,42 @@ def preparar_imagenes(dry_run: bool) -> Dict[str, List[str]]:
 
 # --------------------------------------------------------------------------- zonas
 
-def asegurar_zonas(db, dry_run: bool) -> Dict[object, int]:
-    """Devuelve clave de perfil -> ubicacion_id, creando las zonas nuevas si faltan."""
-    mapa: Dict[object, int] = {}
-    existentes = {u.id: u for u in db.query(Ubicacion).all()}
-    for k in PERFIL_ZONAS:
-        if isinstance(k, int) and k in existentes:
-            mapa[k] = k
+def asegurar_catalogo_geografico(db, dry_run: bool) -> None:
+    """Crea país, provincias y ciudades si la base todavía no los tiene."""
+    faltantes = [c for c in CIUDADES if db.query(Ciudad).filter(Ciudad.nombre == c[0]).first() is None]
+    if not faltantes:
+        return
+    if dry_run:
+        for nombre, *_ in faltantes:
+            print(f"[dry-run] Se crearía la ciudad: {nombre}")
+        return
+    pais = db.query(Pais).filter(Pais.nombre == PAIS).first()
+    if pais is None:
+        pais = Pais(nombre=PAIS, codigo_iso="BO", created_at=datetime.now(), updated_at=datetime.now())
+        db.add(pais)
+        db.commit()
+        db.refresh(pais)
+        print(f"País creado: {PAIS}")
+    for nombre, provincia_nombre, lat, lng in faltantes:
+        prov = db.query(Provincia).filter(Provincia.nombre == provincia_nombre).first()
+        if prov is None:
+            prov = Provincia(nombre=provincia_nombre, pais_id=pais.id, created_at=datetime.now(), updated_at=datetime.now())
+            db.add(prov)
+            db.commit()
+            db.refresh(prov)
+            print(f"Provincia creada: {provincia_nombre}")
+        db.add(Ciudad(nombre=nombre, provincia_id=prov.id, latitud=lat, longitud=lng,
+                      created_at=datetime.now(), updated_at=datetime.now()))
+        db.commit()
+        print(f"Ciudad creada: {nombre}")
+
+
+def asegurar_zonas(db, dry_run: bool) -> Dict[str, int]:
+    """Devuelve dirección -> ubicacion_id, creando las zonas que falten."""
+    asegurar_catalogo_geografico(db, dry_run)
     ciudades = db.query(Ciudad).filter(Ciudad.latitud.isnot(None)).all()
-    for direccion, depto, lat, lng in ZONAS_NUEVAS:
+    mapa: Dict[str, int] = {}
+    for _, direccion, depto, lat, lng in ZONAS:
         u = db.query(Ubicacion).filter(Ubicacion.direccion == direccion).first()
         if u is None:
             if dry_run:
@@ -182,15 +239,14 @@ def asegurar_zonas(db, dry_run: bool) -> Dict[object, int]:
             print(f"Zona creada: {direccion} (id {u.id})")
         mapa[direccion] = u.id
     if not mapa:
-        raise SystemExit("No hay ubicaciones disponibles. Carga primero los catálogos de la base.")
+        raise SystemExit("No se pudieron preparar las zonas de captura.")
     return mapa
 
 
-def asegurar_dispositivos(db, zonas: Dict[object, int], dry_run: bool) -> Dict[object, Optional[int]]:
-    """Devuelve clave de zona -> dispositivo_id, creando la cámara del lugar si falta."""
+def asegurar_dispositivos(db, zonas: Dict[str, int], dry_run: bool) -> Dict[str, Optional[int]]:
+    """Devuelve dirección de zona -> dispositivo_id, creando la cámara del lugar si falta."""
     por_nombre = {d.nombre_dispositivo: d for d in db.query(DispositivoCaptura).all()}
-    direcciones = {u.id: u.direccion for u in db.query(Ubicacion).all()}
-    mapa: Dict[object, Optional[int]] = {}
+    mapa: Dict[str, Optional[int]] = {}
     for clave, (_, _, nombre) in PERFIL_ZONAS.items():
         if clave not in zonas:
             continue
@@ -204,7 +260,7 @@ def asegurar_dispositivos(db, zonas: Dict[object, int], dry_run: bool) -> Dict[o
                 print(f"[dry-run] Se crearía el dispositivo: {nombre}")
                 mapa[clave] = None
                 continue
-            lugar = clave if isinstance(clave, str) else (direcciones.get(clave) or "")
+            lugar = clave
             d = DispositivoCaptura(
                 nombre_dispositivo=nombre,
                 ubicacion_fisica=", ".join(lugar.split(",")[:2]).strip()[:255] or None,
@@ -276,8 +332,9 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
     registros: List[dict] = []
 
     for i, dia in enumerate(elegidos):
-        hora = rng.choices(range(24), HORA_PESO)[0]
-        ts = datetime.combine(dia, time(hora, rng.randint(0, 59), rng.randint(0, 59)))
+        franja = rng.choices(range(len(HORA_PESO_MEDIA)), HORA_PESO_MEDIA)[0]
+        hora, minuto = divmod(franja * FRANJA_MIN + rng.randint(0, FRANJA_MIN - 1), 60)
+        ts = datetime.combine(dia, time(hora, minuto, rng.randint(0, 59)))
         if ts > ahora:
             ts -= timedelta(days=1)
         clave = rng.choices(claves, pesos)[0]
@@ -298,14 +355,11 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
             prob = 0.45
         es_smog = rng.random() < min(max(prob, 0.01), 0.95)
 
-        if es_smog:
-            p = min(max(rng.betavariate(6, 2.2), 0.5), 0.995)
-        else:
-            p = min(max(rng.betavariate(1.8, 7), 0.005), 0.499)
-        p = round(p, 4)
-        clase = "smog" if p >= 0.5 else "sin_smog"
-        confianza = round(p if clase == "smog" else 1 - p, 4)
-        nombre_zona = clave if isinstance(clave, str) else f"U{clave}"
+        clase = "smog" if es_smog else "sin_smog"
+        # El sistema es binario: el único número es la confianza de la predicción.
+        confianza = round(CONFIANZA_MIN + (CONFIANZA_MAX - CONFIANZA_MIN) * rng.betavariate(5, 2), 4)
+        p = confianza
+        nombre_zona = NOMBRE_CORTO.get(clave, str(clave))
         stats[nombre_zona][0] += 1
         stats[nombre_zona][1] += clase == "smog"
         total_smog += clase == "smog"
@@ -381,7 +435,7 @@ def imprimir(r: dict, dry_run: bool) -> None:
     print("Por zona (total · con smog · %):")
     for z, (tot, sm) in sorted(r["zonas"].items(), key=lambda x: -x[1][1] / max(x[1][0], 1)):
         pct = sm / tot * 100 if tot else 0
-        nivel = "Alto" if pct > 60 else "Moderado" if pct > 30 else "Bajo"
+        nivel = "Alto" if pct > 30 else "Moderado" if pct > 15 else "Bajo"
         print(f"  {z:40} {tot:4} · {sm:4} · {pct:5.1f} %  {nivel}")
 
 

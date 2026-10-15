@@ -70,7 +70,6 @@ class PorUbicacionItem(BaseModel):
     ciudad_id: Optional[int] = None
     ciudad: Optional[str] = None
     nivel: str = "Sin smog"
-    p_smog_promedio: float = 0.0
 
 
 class PorUsuarioItem(BaseModel):
@@ -90,7 +89,6 @@ class TablaResumenRow(BaseModel):
     total_smog: int
     pct_smog: float
     confianza_promedio: float
-    p_smog_promedio: float
 
 
 # --- Filtros compartidos ---
@@ -316,7 +314,6 @@ def fetch_tabla_resumen_data(
         func.count(Prediccion.id).label("total"),
         SMOG_SUM.label("smog"),
         func.avg(Prediccion.confianza).label("confianza"),
-        func.avg(Prediccion.p_smog).label("p_smog"),
     )
     rows = f.apply_pred(q).group_by(col).order_by(col).all()
     return [
@@ -326,7 +323,6 @@ def fetch_tabla_resumen_data(
             total_smog=int(r.smog or 0),
             pct_smog=_pct(r.smog, r.total or 1),
             confianza_promedio=round(float(r.confianza or 0), 4),
-            p_smog_promedio=round(float(r.p_smog or 0), 4),
         )
         for r in rows
     ]
@@ -338,7 +334,6 @@ def fetch_por_ubicacion(db: Session, f: ReportFilters) -> List[PorUbicacionItem]
             Imagen.ubicacion_id.label("ubicacion_id"),
             func.count(Prediccion.id).label("total"),
             SMOG_SUM.label("smog"),
-            func.avg(Prediccion.p_smog).label("p_smog_prom"),
         )
         .join(Prediccion, Imagen.id == Prediccion.imagen_id)
         .filter(Imagen.ubicacion_id.isnot(None))
@@ -355,7 +350,6 @@ def fetch_por_ubicacion(db: Session, f: ReportFilters) -> List[PorUbicacionItem]
             Ciudad.nombre.label("ciudad"),
             sub.c.total,
             sub.c.smog,
-            sub.c.p_smog_prom,
         )
         .join(sub, Ubicacion.id == sub.c.ubicacion_id)
         .outerjoin(Ciudad, Ciudad.id == Ubicacion.ciudad_id)
@@ -383,7 +377,6 @@ def fetch_por_ubicacion(db: Session, f: ReportFilters) -> List[PorUbicacionItem]
                 ciudad_id=r.ciudad_id,
                 ciudad=r.ciudad,
                 nivel=nivel_smog(pct, smog),
-                p_smog_promedio=round(float(r.p_smog_prom or 0), 4),
             )
         )
     return out
@@ -479,12 +472,6 @@ async def get_tendencia_imagenes(
 async def get_distribucion_confianza(user: Usuario = Depends(_require), db: Session = Depends(get_db), f: ReportFilters = Depends(report_filters)):
     """Histograma de confianza en 5 rangos."""
     return fetch_distribucion(db, f, Prediccion.confianza)
-
-
-@router.get("/distribucion-p-smog", response_model=List[HistogramBucket])
-async def get_distribucion_p_smog(user: Usuario = Depends(_require), db: Session = Depends(get_db), f: ReportFilters = Depends(report_filters)):
-    """Histograma de p_smog en 5 rangos."""
-    return fetch_distribucion(db, f, Prediccion.p_smog)
 
 
 @router.get("/por-ubicacion", response_model=List[PorUbicacionItem])

@@ -15,11 +15,11 @@ def seed_placas(db, user_id):
     db.add(DispositivoCaptura(id=1, nombre_dispositivo="Cam A", activo=True))
     db.flush()
     filas = [
-        # id, clase, p_smog, placa, fecha, ubicacion
+        # id, clase, confianza, placa, fecha, ubicacion
         (1, "smog", 0.95, None, datetime(2026, 10, 5, 8, 0), 1),
         (2, "smog", 0.80, "  ", datetime(2026, 10, 6, 9, 0), 1),
         (3, "smog", 0.70, "1234ABC", datetime(2026, 10, 3, 10, 0), 2),
-        (4, "sin_smog", 0.20, None, datetime(2026, 10, 4, 11, 0), 2),
+        (4, "sin_smog", 0.75, None, datetime(2026, 10, 4, 11, 0), 2),
         (5, "smog", 0.60, None, datetime(2026, 9, 20, 12, 0), 1),
     ]
     for i, clase, p, placa, ts, ub in filas:
@@ -35,7 +35,7 @@ def seed_placas(db, user_id):
         )
         img.prediccion = Prediccion(
             clase_predicha=clase,
-            confianza=p if clase == "smog" else 1 - p,
+            confianza=p,
             p_smog=p,
             fecha_prediccion=ts,
         )
@@ -59,7 +59,7 @@ def ids(r):
 
 def test_cola_por_defecto_smog_sin_placa(client, datos, H):
     r = client.get(f"{B}/vehiculos", headers=H).json()
-    assert ids(r) == [1, 2, 5]
+    assert ids(r) == [2, 1, 5]  # por defecto: más recientes primero
     assert r["total"] == 3
     assert r["resumen"] == {"total": 4, "con_placa": 1, "sin_placa": 3, "pct_completado": 25.0}
 
@@ -81,7 +81,7 @@ def test_filtro_clase(client, datos, H):
 
 def test_filtros_fecha_y_zona(client, datos, H):
     r = client.get(f"{B}/vehiculos?desde=2026-10-01&hasta=2026-10-09", headers=H).json()
-    assert ids(r) == [1, 2]
+    assert ids(r) == [2, 1]
     assert r["resumen"]["total"] == 3
     assert ids(client.get(f"{B}/vehiculos?estado=todas&ubicacion_id=2", headers=H).json()) == [3]
 
@@ -95,8 +95,8 @@ def test_paginacion(client, datos, H):
     assert ids(r) == [5] and r["total"] == 3 and r["page"] == 2
 
 
-def test_orden_fecha(client, datos, H):
-    assert ids(client.get(f"{B}/vehiculos?orden=fecha", headers=H).json()) == [2, 1, 5]
+def test_orden_confianza(client, datos, H):
+    assert ids(client.get(f"{B}/vehiculos?orden=confianza", headers=H).json()) == [1, 2, 5]
 
 
 def test_obtener_vehiculo_y_404(client, datos, H):

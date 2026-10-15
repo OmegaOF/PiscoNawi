@@ -17,7 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import VisorImagen from './VisorImagen';
 import OcrPanel from './OcrPanel';
-import NivelBadge from '../../components/reports/NivelBadge';
+import ClaseBadge from '../../components/reports/ClaseBadge';
 import { useOcrPlaca } from '../../hooks/useOcrPlaca';
 import { esFormatoBoliviano, normalizarPlaca, VehiculoPlaca } from '../../lib/placasApi';
 import { RectNat } from '../../lib/ocrPlaca';
@@ -111,7 +111,7 @@ const EstacionPlaca: React.FC<Props> = ({ item, posicion, guardando, inputRef, o
         />
         <div className="absolute left-3 top-3 flex items-center gap-2">
           <span className="rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">{posicion}</span>
-          <NivelBadge pct={item.p_smog * 100} size="sm" className="bg-white/90" />
+          <ClaseBadge clase={item.clase_predicha} size="sm" className="bg-white/90" />
         </div>
         {modoRecorte && (
           <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
@@ -178,7 +178,7 @@ const EstacionPlaca: React.FC<Props> = ({ item, posicion, guardando, inputRef, o
             </span>
           )}
           <span className="ml-auto text-text-dark">
-            Prob. de smog <strong>{fmtPct01(item.p_smog, 1)}</strong> · Confianza <strong>{fmtPct01(item.confianza, 1)}</strong>
+            Confianza <strong>{fmtPct01(item.confianza, 1)}</strong>
           </span>
         </div>
 

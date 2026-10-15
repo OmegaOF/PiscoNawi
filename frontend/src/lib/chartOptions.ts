@@ -2,9 +2,9 @@
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 import { ChartCtx } from './chartTheme';
-import { Agrupar, Bucket, DispositivoItem, HeatCell, ScatterPoint, TendenciaItem, UsuarioItem, ZonaItem } from './reportsApi';
+import { Agrupar, Bucket, DispositivoItem, HeatCell, TendenciaItem, UsuarioItem, ZonaItem } from './reportsApi';
 import { DIAS_CORTOS, fmtDate, fmtHora, fmtInt, fmtNum, fmtPct, fmtPeriodo, hexA } from './format';
-import { etiquetaZona, nivelSmog } from './smog';
+import { etiquetaZona, nivelSmog, UMBRAL_ALTO, UMBRAL_MODERADO } from './smog';
 
 const tip = (rows: string[]) => rows.join('<br/>');
 const dot = (c: string) => `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c};margin-right:6px"></span>`;
@@ -26,8 +26,8 @@ export function gaugeOption(pct: number, ctx: ChartCtx): EChartsOption {
           lineStyle: {
             width: ctx.fs(18),
             color: [
-              [0.3, ctx.lvl('bajo')],
-              [0.6, ctx.lvl('moderado')],
+              [UMBRAL_MODERADO / 100, ctx.lvl('bajo')],
+              [UMBRAL_ALTO / 100, ctx.lvl('moderado')],
               [1, ctx.lvl('alto')],
             ],
           },
@@ -143,6 +143,26 @@ export function trendOption(rows: TendenciaItem[], imgRows: TendenciaItem[] | nu
   };
 }
 
+/** Tres bandas de color por % de detecciones con smog: verde / naranja / rojo. */
+function bandasSmog(ctx: ChartCtx, dimension: number) {
+  return {
+    type: 'piecewise' as const,
+    dimension,
+    orient: 'horizontal' as const,
+    left: 'center' as const,
+    bottom: 0,
+    itemWidth: 16,
+    itemHeight: 12,
+    itemGap: 14,
+    textStyle: { color: ctx.muted, fontSize: ctx.fs(11) },
+    pieces: [
+      { lte: UMBRAL_MODERADO, color: ctx.lvl('bajo'), label: `Hasta ${UMBRAL_MODERADO} %` },
+      { gt: UMBRAL_MODERADO, lte: UMBRAL_ALTO, color: ctx.lvl('moderado'), label: `${UMBRAL_MODERADO}–${UMBRAL_ALTO} %` },
+      { gt: UMBRAL_ALTO, color: ctx.lvl('alto'), label: `Más de ${UMBRAL_ALTO} %` },
+    ],
+  };
+}
+
 // --- Calendario ------------------------------------------------------------
 export function calendarOption(days: TendenciaItem[], range: [string, string], ctx: ChartCtx): EChartsOption {
   return {
@@ -150,20 +170,7 @@ export function calendarOption(days: TendenciaItem[], range: [string, string], c
       formatter: (p: any) =>
         tip([`<b>${fmtDate(p.value[0])}</b>`, `Con smog: <b>${fmtPct(p.value[1])}</b>`, `Vehículos: ${fmtInt(p.value[2])}`]),
     },
-    visualMap: {
-      min: 0,
-      max: 100,
-      calculable: false,
-      orient: 'horizontal',
-      left: 'center',
-      bottom: 0,
-      itemWidth: 12,
-      itemHeight: 160,
-      text: ['100 %', '0 %'],
-      dimension: 1,
-      inRange: { color: ctx.seq },
-      textStyle: { color: ctx.muted, fontSize: ctx.fs(11) },
-    },
+    visualMap: bandasSmog(ctx, 1),
     calendar: {
       top: 28,
       left: 36,
@@ -210,19 +217,7 @@ export function hourHeatmapOption(cells: HeatCell[], ctx: ChartCtx): EChartsOpti
     grid: { left: 8, right: 8, top: 8, bottom: 56, containLabel: true },
     xAxis: { type: 'category', data: hours.map((h) => `${h}h`), splitArea: { show: false }, axisLabel: { fontSize: ctx.fs(10), interval: 1 }, axisLine: { show: false } },
     yAxis: { type: 'category', data: DIAS_CORTOS, inverse: true, axisLabel: { fontSize: ctx.fs(11) }, axisLine: { show: false } },
-    visualMap: {
-      min: 0,
-      max: 100,
-      orient: 'horizontal',
-      left: 'center',
-      bottom: 0,
-      itemWidth: 12,
-      itemHeight: 180,
-      text: ['100 % con smog', '0 %'],
-      dimension: 2,
-      inRange: { color: ctx.seq },
-      textStyle: { color: ctx.muted, fontSize: ctx.fs(11) },
-    },
+    visualMap: bandasSmog(ctx, 2),
     series: [
       {
         type: 'heatmap',
@@ -270,7 +265,7 @@ export function rankingBarOption(items: RankItem[], ctx: ChartCtx): EChartsOptio
           symbol: 'none',
           lineStyle: { color: ctx.muted, type: 'solid', width: 1, opacity: 0.5 },
           label: { show: false },
-          data: [{ xAxis: 30 }, { xAxis: 60 }],
+          data: [{ xAxis: UMBRAL_MODERADO }, { xAxis: UMBRAL_ALTO }],
         },
         animationDelay: (i: number) => i * 80,
       },
@@ -287,49 +282,9 @@ export const dispToRank = (d: DispositivoItem): RankItem => ({
   total: d.total,
 });
 
-// --- Histograma agrupado ----------------------------------------------------
-export function histogramGroupedOption(conf: Bucket[], psmog: Bucket[], ctx: ChartCtx): EChartsOption {
-  const labels = (conf.length ? conf : psmog).map((b) => b.rango.replace('-', ' – '));
-  return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    legend: { top: 0, left: 0 },
-    grid: { left: 8, right: 8, top: 36, bottom: 8, containLabel: true },
-    xAxis: { type: 'category', data: labels, axisLabel: { fontSize: ctx.fs(11) } },
-    yAxis: { type: 'value', minInterval: 1 },
-    series: [
-      {
-        name: 'Confianza',
-        type: 'bar',
-        barMaxWidth: 26,
-        barGap: '12%',
-        itemStyle: { color: ctx.cls.ter, borderRadius: [4, 4, 0, 0] },
-        label: { show: true, position: 'top', fontSize: ctx.fs(10), color: ctx.muted, formatter: (p: any) => (p.value ? fmtInt(p.value) : '') },
-        data: conf.map((b) => b.cantidad),
-      },
-      {
-        name: 'Probabilidad de smog (p_smog)',
-        type: 'bar',
-        barMaxWidth: 26,
-        itemStyle: { color: ctx.cls.smog, borderRadius: [4, 4, 0, 0] },
-        label: { show: true, position: 'top', fontSize: ctx.fs(10), color: ctx.muted, formatter: (p: any) => (p.value ? fmtInt(p.value) : '') },
-        data: psmog.map((b) => b.cantidad),
-      },
-    ],
-    animationDelay: (i: number) => i * 60,
-  };
-}
-
-// --- Separación de clases (histograma fino de p_smog) -----------------------
-export function separationOption(points: ScatterPoint[], ctx: ChartCtx): EChartsOption {
-  const BINS = 20;
-  const smog = new Array(BINS).fill(0);
-  const sin = new Array(BINS).fill(0);
-  points.forEach((p) => {
-    const i = Math.min(BINS - 1, Math.max(0, Math.floor(p.p_smog * BINS)));
-    if (p.clase === 'smog') smog[i] += 1;
-    else sin[i] += 1;
-  });
-  const labels = Array.from({ length: BINS }, (_, i) => `${i * 5}–${(i + 1) * 5}%`);
+// --- Histograma de confianza ------------------------------------------------
+export function confianzaHistogramOption(conf: Bucket[], ctx: ChartCtx): EChartsOption {
+  const labels = conf.map((b) => b.rango.replace('-', ' – '));
   return {
     tooltip: {
       trigger: 'axis',
@@ -337,51 +292,30 @@ export function separationOption(points: ScatterPoint[], ctx: ChartCtx): ECharts
       formatter: (ps: any) => {
         const list = Array.isArray(ps) ? ps : [ps];
         const i = list[0]?.dataIndex ?? 0;
-        return tip([`<b>p_smog ${labels[i]}</b>`, ...list.filter((p: any) => p.value).map((p: any) => `${dot(p.color)}${p.seriesName}: <b>${fmtInt(p.value)}</b>`)]);
+        return tip([`<b>Confianza ${labels[i]}</b>`, `${dot(ctx.cls.ter)}Predicciones: <b>${fmtInt(list[0]?.value ?? 0)}</b>`]);
       },
     },
-    legend: { top: 0, left: 0 },
-    grid: { left: 8, right: 12, top: 36, bottom: 28, containLabel: true },
+    grid: { left: 8, right: 12, top: 24, bottom: 28, containLabel: true },
     xAxis: {
       type: 'category',
       data: labels,
-      name: 'Probabilidad de smog asignada por la CNN',
+      name: 'Confianza de la predicción',
       nameLocation: 'middle',
       nameGap: 30,
-      axisLabel: { fontSize: ctx.fs(10), interval: 3, formatter: (_: string, i: number) => `${i * 5}%` },
+      axisLabel: { fontSize: ctx.fs(11) },
     },
     yAxis: { type: 'value', minInterval: 1 },
     series: [
       {
-        name: 'Sin smog',
+        name: 'Predicciones',
         type: 'bar',
-        stack: 'c',
-        barCategoryGap: '8%',
-        itemStyle: { color: ctx.cls.sin_smog, borderColor: ctx.surface, borderWidth: 1 },
-        data: sin,
-        markArea: {
-          silent: true,
-          itemStyle: { color: ctx.dark ? 'rgba(232,165,50,0.10)' : 'rgba(217,142,4,0.10)' },
-          label: { show: true, position: 'insideTop', formatter: 'Zona de duda', color: ctx.muted, fontSize: ctx.fs(10) },
-          data: [[{ xAxis: labels[9] }, { xAxis: labels[10] }]],
-        },
-      },
-      {
-        name: 'Con smog',
-        type: 'bar',
-        stack: 'c',
-        itemStyle: { color: ctx.cls.smog, borderColor: ctx.surface, borderWidth: 1, borderRadius: [3, 3, 0, 0] },
-        data: smog,
-        markLine: {
-          silent: true,
-          symbol: 'none',
-          lineStyle: { color: ctx.text, type: 'solid', width: 1.5 },
-          label: { formatter: 'Umbral 50 %', color: ctx.text, fontSize: ctx.fs(11), position: 'end' },
-          data: [{ xAxis: labels[10] }],
-        },
+        barMaxWidth: 48,
+        itemStyle: { color: ctx.cls.ter, borderRadius: [4, 4, 0, 0] },
+        label: { show: true, position: 'top', fontSize: ctx.fs(11), color: ctx.muted, formatter: (p: any) => (p.value ? fmtInt(p.value) : '') },
+        data: conf.map((b) => b.cantidad),
       },
     ],
-    animationDuration: 900,
+    animationDelay: (i: number) => i * 60,
   };
 }
 

@@ -21,10 +21,10 @@ def generar_reporte_detallado_pdf(file_path: Path, db, payload, usuario_nombre: 
         story.append(Paragraph(NO_DATA_MESSAGE, styles["Normal"]))
     else:
         story.append(Paragraph("Tabla por periodo", table_title_style))
-        data = [["Periodo", "Total de análisis", "Casos con smog", "% con smog", "Confianza promedio", "Smog promedio"]]
+        data = [["Periodo", "Total de análisis", "Casos con smog", "% con smog", "Confianza promedio"]]
         for r in rows:
-            data.append([r.periodo, str(r.total_predicciones), str(r.total_smog), f"{r.pct_smog:.2f}", f"{r.confianza_promedio:.4f}", f"{r.p_smog_promedio:.4f}"])
-        story.append(tabla_estilizada(data, [70, 95, 90, 78, 105, 85]))
+            data.append([r.periodo, str(r.total_predicciones), str(r.total_smog), f"{r.pct_smog:.2f}", f"{r.confianza_promedio:.4f}"])
+        story.append(tabla_estilizada(data, [85, 110, 105, 90, 120]))
         story.append(Spacer(1, 12))
         total_pred = sum(r.total_predicciones for r in rows)
         total_smog = sum(r.total_smog for r in rows)

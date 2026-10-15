@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon, MapPinIcon, ClockIcon, IdentificationIcon } from '@heroicons/react/24/outline';
 import { CapturaTop } from '../../lib/reportsApi';
 import { fmtDateTime, fmtPct01 } from '../../lib/format';
-import NivelBadge from './NivelBadge';
+import ClaseBadge from './ClaseBadge';
 
 interface LightboxProps {
   items: CapturaTop[];
@@ -81,10 +81,10 @@ const Lightbox: React.FC<LightboxProps> = ({ items, index, onClose, onNavigate }
             />
             <div className="flex flex-1 flex-col gap-4 p-6">
               <div>
-                <p className="text-xs uppercase tracking-widest text-pres-muted">Probabilidad de smog</p>
-                <p className="text-5xl font-extrabold">{fmtPct01(item.p_smog, 1)}</p>
+                <p className="text-xs uppercase tracking-widest text-pres-muted">Confianza de la predicción</p>
+                <p className="text-5xl font-extrabold">{fmtPct01(item.confianza, 1)}</p>
               </div>
-              <NivelBadge pct={item.p_smog * 100} size="md" />
+              <ClaseBadge clase={item.clase_predicha} size="md" />
               <dl className="space-y-3 text-sm">
                 <div className="flex items-center gap-2">
                   <IdentificationIcon className="h-4 w-4 text-pres-muted" />
@@ -100,10 +100,6 @@ const Lightbox: React.FC<LightboxProps> = ({ items, index, onClose, onNavigate }
                   <ClockIcon className="h-4 w-4 text-pres-muted" />
                   <dt className="text-pres-muted">Fecha:</dt>
                   <dd>{fmtDateTime(item.fecha_prediccion)}</dd>
-                </div>
-                <div className="flex items-center gap-2">
-                  <dt className="text-pres-muted">Confianza del modelo:</dt>
-                  <dd className="font-semibold">{fmtPct01(item.confianza, 1)}</dd>
                 </div>
               </dl>
               <p className="mt-auto text-xs text-pres-muted">

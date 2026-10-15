@@ -47,7 +47,7 @@ const OperacionSection: React.FC<SectionProps> = ({ data }) => {
                 <th className="py-1.5 font-medium">Dispositivo</th>
                 <th className="py-1.5 font-medium">Estado</th>
                 <th className="py-1.5 text-right font-medium">Vehículos</th>
-                <th className="py-1.5 text-right font-medium">p_smog prom.</th>
+                <th className="py-1.5 text-right font-medium">Confianza prom.</th>
               </tr>
             </thead>
             <tbody className={cx('divide-y', s.dark ? 'divide-pres-border' : 'divide-neutral-border')}>
@@ -61,7 +61,7 @@ const OperacionSection: React.FC<SectionProps> = ({ data }) => {
                     </span>
                   </td>
                   <td className="py-1.5 text-right tabular-nums">{fmtInt(d.total)}</td>
-                  <td className="py-1.5 text-right tabular-nums">{d.total ? fmtPct01(d.p_smog_promedio, 0) : '—'}</td>
+                  <td className="py-1.5 text-right tabular-nums">{d.total ? fmtPct01(d.confianza_promedio, 0) : '—'}</td>
                 </tr>
               ))}
               {sinDispositivo > 0 && (

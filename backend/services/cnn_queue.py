@@ -273,8 +273,9 @@ def _run_post_processing_analysis(db: Session, reanalizar: bool = False):
                 loop.close()
 
                 prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
-                prediccion.confianza = resultado["nivel_confianza"] / 100.0
-                prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
+                confianza = resultado["nivel_confianza"] / 100.0
+                prediccion.confianza = confianza
+                prediccion.p_smog = confianza
                 prediccion.observacion = MARCA_REVISADA
                 prediccion.fecha_prediccion = func.now()
                 db.commit()  # Se guarda una por una: un fallo posterior no deshace lo ya revisado

@@ -21,7 +21,6 @@ async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nomb
     total_smog = sum(r.total_smog for r in rows)
     total_img = db.query(func.count(Imagen.id)).scalar() or 0
     conf_avg = round((sum(r.confianza_promedio * r.total_predicciones for r in rows) / total_pred), 4) if total_pred else 0.0
-    p_smog_avg = round((sum(r.p_smog_promedio * r.total_predicciones for r in rows) / total_pred), 4) if total_pred else 0.0
     pct_smog = safe_pct(total_smog, total_pred)
 
     styles = build_styles()
@@ -34,7 +33,7 @@ async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nomb
     if total_pred == 0:
         story.append(Paragraph(NO_DATA_MESSAGE, styles["Normal"]))
     else:
-        story.append(kpi_cards([("Total imágenes", str(total_img)), ("Total de análisis", str(total_pred)), ("% con smog", f"{pct_smog:.2f}%"), ("Confianza promedio", f"{conf_avg:.4f}"), ("Smog promedio", f"{p_smog_avg:.4f}"), ("Periodo", payload.agrupar)]))
+        story.append(kpi_cards([("Total imágenes", str(total_img)), ("Total de análisis", str(total_pred)), ("% con smog", f"{pct_smog:.2f}%"), ("Confianza promedio", f"{conf_avg:.4f}"), ("Periodo", payload.agrupar)]))
         story.append(Spacer(1, 10))
 
         # Cambios en el tiempo
@@ -72,10 +71,10 @@ async def generar_reporte_general_pdf(file_path: Path, db, payload, usuario_nomb
 
         story.append(Spacer(1, 8))
         story.append(Paragraph("Resumen por periodo", table_title_style))
-        data = [["Periodo", "Total de análisis", "Casos con smog", "% con smog", "Confianza promedio", "Smog promedio"]]
+        data = [["Periodo", "Total de análisis", "Casos con smog", "% con smog", "Confianza promedio"]]
         for r in rows:
-            data.append([r.periodo, str(r.total_predicciones), str(r.total_smog), f"{r.pct_smog:.2f}", f"{r.confianza_promedio:.4f}", f"{r.p_smog_promedio:.4f}"])
-        story.append(tabla_estilizada(data, [70, 95, 90, 78, 105, 85]))
+            data.append([r.periodo, str(r.total_predicciones), str(r.total_smog), f"{r.pct_smog:.2f}", f"{r.confianza_promedio:.4f}"])
+        story.append(tabla_estilizada(data, [85, 110, 105, 90, 120]))
         story.append(Spacer(1, 8))
         story.append(caja_conclusion(observacion_por_pct_smog(pct_smog), styles))
 

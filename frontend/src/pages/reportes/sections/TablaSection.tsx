@@ -18,15 +18,12 @@ const TablaSection: React.FC<SectionProps> = ({ data, filters }) => {
   const tot = rows.reduce((a, r) => a + r.total_predicciones, 0);
   const smog = rows.reduce((a, r) => a + r.total_smog, 0);
   const conf = tot ? rows.reduce((a, r) => a + r.confianza_promedio * r.total_predicciones, 0) / tot : 0;
-  const ps = tot ? rows.reduce((a, r) => a + r.p_smog_promedio * r.total_predicciones, 0) / tot : 0;
 
   const exportCsv = () => {
     const dec = (n: number, d = 2) => n.toFixed(d).replace('.', ',');
     const lines = [
-      ['Período', 'Predicciones', 'Con smog', '% con smog', 'Confianza promedio (%)', 'p_smog promedio (%)'].join(';'),
-      ...rows.map((r) =>
-        [fmtPeriodo(r.periodo, filters.agrupar), r.total_predicciones, r.total_smog, dec(r.pct_smog), dec(r.confianza_promedio * 100), dec(r.p_smog_promedio * 100)].join(';'),
-      ),
+      ['Período', 'Predicciones', 'Con smog', '% con smog', 'Confianza promedio (%)'].join(';'),
+      ...rows.map((r) => [fmtPeriodo(r.periodo, filters.agrupar), r.total_predicciones, r.total_smog, dec(r.pct_smog), dec(r.confianza_promedio * 100)].join(';')),
     ];
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -72,7 +69,6 @@ const TablaSection: React.FC<SectionProps> = ({ data, filters }) => {
                 <th className={cx(th, 'text-right')}>Con smog</th>
                 <th className={cx(th, 'w-1/4 text-left')}>% con smog</th>
                 <th className={cx(th, 'text-right')}>Confianza prom.</th>
-                <th className={cx(th, 'text-right')}>p_smog prom.</th>
               </tr>
             </thead>
             <tbody className={cx('divide-y', s.dark ? 'divide-pres-border' : 'divide-neutral-border')}>
@@ -94,7 +90,6 @@ const TablaSection: React.FC<SectionProps> = ({ data, filters }) => {
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtNum(r.confianza_promedio * 100, 1)} %</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{fmtNum(r.p_smog_promedio * 100, 1)} %</td>
                   </tr>
                 );
               })}
@@ -107,7 +102,6 @@ const TablaSection: React.FC<SectionProps> = ({ data, filters }) => {
                   <td className="px-4 py-3 text-right tabular-nums">{fmtInt(smog)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{fmtPct(tot ? (smog / tot) * 100 : 0, 1)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{fmtNum(conf * 100, 1)} %</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{fmtNum(ps * 100, 1)} %</td>
                 </tr>
               </tfoot>
             )}

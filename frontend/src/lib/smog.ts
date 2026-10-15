@@ -3,8 +3,8 @@ import type { HeatCell, Kpis, ZonaItem } from './reportsApi';
 
 export type Nivel = 'alto' | 'moderado' | 'bajo' | 'sin';
 
-export const UMBRAL_ALTO = 60;
-export const UMBRAL_MODERADO = 30;
+export const UMBRAL_ALTO = 30;
+export const UMBRAL_MODERADO = 15;
 
 /** Mismos umbrales que el backend (utils_reportes.nivel_smog). */
 export function nivelSmog(pct: number, smog?: number | null): Nivel {
@@ -37,9 +37,9 @@ export const NIVEL_LABEL: Record<Nivel, string> = {
 };
 
 export const NIVEL_DESC: Record<Nivel, string> = {
-  alto: 'Más del 60 % de los vehículos presentó smog',
-  moderado: 'Entre 30 % y 60 % de los vehículos presentó smog',
-  bajo: 'Menos del 30 % de los vehículos presentó smog',
+  alto: 'Más del 30 % de los vehículos presentó smog',
+  moderado: 'Entre 15 % y 30 % de los vehículos presentó smog',
+  bajo: 'Hasta 15 % de los vehículos presentó smog',
   sin: 'No se detectó smog',
 };
 

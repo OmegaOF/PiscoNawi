@@ -66,7 +66,7 @@ const MapaSection: React.FC<SectionProps> = ({ data }) => {
           onRetry={data.zonas.reload}
           empty={!!data.zonas.data && zonas.length === 0}
           minHeight={300}
-          help={<p>Las líneas verticales marcan los umbrales de 30 % (moderado) y 60 % (alto).</p>}
+          help={<p>Las líneas verticales marcan los umbrales de 15 % (moderado) y 30 % (alto).</p>}
         >
           <EChart
             option={rankingBarOption(ranking, ctx)}

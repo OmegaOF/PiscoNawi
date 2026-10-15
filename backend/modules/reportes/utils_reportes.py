@@ -44,8 +44,8 @@ def safe_pct(part: float, total: float) -> float:
 
 
 # Umbrales oficiales de nivel de smog (porcentaje de vehículos con smog)
-SMOG_PCT_ALTO = 60.0
-SMOG_PCT_MODERADO = 30.0
+SMOG_PCT_ALTO = 30.0
+SMOG_PCT_MODERADO = 15.0
 NIVEL_SIN_SMOG = "Sin smog"
 NIVEL_BAJO = "Bajo"
 NIVEL_MODERADO = "Moderado"
@@ -59,7 +59,7 @@ NIVEL_COLORES = {
 
 
 def nivel_smog(pct_smog: float, smog_count: Optional[int] = None) -> str:
-    """Clasifica un porcentaje de smog en Alto / Moderado / Bajo / Sin smog."""
+    """Clasifica el porcentaje de detecciones con smog: Alto >30 %, Moderado 15-30 %, Bajo <=15 %."""
     if smog_count is not None and smog_count <= 0:
         return NIVEL_SIN_SMOG
     if pct_smog > SMOG_PCT_ALTO:

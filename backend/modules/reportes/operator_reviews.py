@@ -16,7 +16,6 @@ class HistorialPropioItem(BaseModel):
     placa_manual: Optional[str]
     clase_predicha: str
     confianza: float
-    p_smog: float
     observacion: Optional[str]
     fecha_prediccion: str
 
@@ -34,7 +33,6 @@ async def get_historial_propio(
             Imagen.placa_manual,
             Prediccion.clase_predicha,
             Prediccion.confianza,
-            Prediccion.p_smog,
             Prediccion.observacion,
             Prediccion.fecha_prediccion,
         )
@@ -53,7 +51,6 @@ async def get_historial_propio(
             placa_manual=r.placa_manual,
             clase_predicha=r.clase_predicha,
             confianza=float(r.confianza),
-            p_smog=float(r.p_smog),
             observacion=r.observacion,
             fecha_prediccion=r.fecha_prediccion.strftime("%Y-%m-%d %H:%M:%S") if r.fecha_prediccion else "",
         )

@@ -54,14 +54,44 @@ ZONAS = {
     5: (0.10, 0.08, 6),  # Tiquipaya       -> Cámara Tiquipaya
     6: (0.10, 0.18, 1),  # Colcapirhua     -> Cámara Blanco Galindo
 }
-HORA_PESO = [0.2, 0.1, 0.1, 0.1, 0.2, 0.6, 1.4, 2.6, 2.4, 1.6, 1.3, 1.4,
-             1.6, 1.3, 1.1, 1.2, 1.6, 2.4, 2.6, 1.8, 1.1, 0.8, 0.5, 0.3]
-HORA_SMOG_DELTA = {7: .15, 8: .15, 9: .12, 17: .13, 18: .15, 19: .12, 12: .05, 13: .05, 14: .04,
-                   0: -.10, 1: -.10, 2: -.10, 3: -.10, 4: -.10, 5: -.05}
+# Peso de tráfico por franja de media hora (48 franjas: 00:00, 00:30, 01:00, ...).
+# Pico de la tarde en 17:30-19:00; valle de media mañana en 10:30-11:30.
+FRANJA_MIN = 30
+HORA_PESO_MEDIA = [
+    0.20, 0.18,  # 00:00  00:30
+    0.10, 0.10,  # 01:00  01:30
+    0.10, 0.10,  # 02:00  02:30
+    0.10, 0.10,  # 03:00  03:30
+    0.20, 0.25,  # 04:00  04:30
+    0.60, 0.80,  # 05:00  05:30
+    1.30, 1.60,  # 06:00  06:30
+    2.00, 2.20,  # 07:00  07:30
+    2.10, 1.90,  # 08:00  08:30
+    1.50, 1.30,  # 09:00  09:30
+    1.10, 0.55,  # 10:00  10:30 <- valle
+    0.50, 0.60,  # 11:00  11:30 <- valle hasta 11:30
+    1.40, 1.50,  # 12:00  12:30
+    1.40, 1.30,  # 13:00  13:30
+    1.10, 1.10,  # 14:00  14:30
+    1.20, 1.30,  # 15:00  15:30
+    1.50, 1.70,  # 16:00  16:30
+    1.90, 3.20,  # 17:00  17:30 <- pico
+    3.40, 3.30,  # 18:00  18:30 <- pico
+    2.00, 1.60,  # 19:00  19:30
+    1.20, 1.00,  # 20:00  20:30
+    0.80, 0.70,  # 21:00  21:30
+    0.50, 0.40,  # 22:00  22:30
+    0.30, 0.25,  # 23:00  23:30
+]
+# Compatibilidad: peso por hora entera (suma de sus dos medias horas).
+HORA_PESO = [HORA_PESO_MEDIA[2 * h] + HORA_PESO_MEDIA[2 * h + 1] for h in range(24)]
+HORA_SMOG_DELTA = {7: .15, 8: .15, 9: .12, 17: .15, 18: .15, 19: .12, 12: .05, 13: .05, 14: .04,
+                   0: -.10, 1: -.10, 2: -.10, 3: -.10, 4: -.10, 5: -.05, 10: -.04, 11: -.04}
 DIA_PESO = [1.0, 1.0, 1.0, 1.0, 1.1, 0.6, 0.35]  # lunes..domingo
 DIA_SMOG_DELTA = {5: -0.05, 6: -0.07}
 MES_SMOG_DELTA = {4: -.05, 5: -.02, 6: .02, 7: .06, 8: .08, 9: .05, 10: .0}  # estación seca peor
 VOLUMEN_INICIAL, VOLUMEN_FINAL = 0.8, 1.2
+CONFIANZA_MIN, CONFIANZA_MAX = 0.60, 0.97
 
 USUARIOS_PESO = {
     "operador@pisco.local": 0.45,
@@ -203,8 +233,9 @@ def run_seed(
     min_ts = max_ts = None
 
     for i, dia in enumerate(dias):
-        hora = rng.choices(range(24), HORA_PESO)[0]
-        ts = datetime.combine(dia, time(hora, rng.randint(0, 59), rng.randint(0, 59)))
+        franja = rng.choices(range(len(HORA_PESO_MEDIA)), HORA_PESO_MEDIA)[0]
+        hora, minuto = divmod(franja * FRANJA_MIN + rng.randint(0, FRANJA_MIN - 1), 60)
+        ts = datetime.combine(dia, time(hora, minuto, rng.randint(0, 59)))
         if ts > ahora:
             ts -= timedelta(days=1)
 
@@ -228,13 +259,10 @@ def run_seed(
         prob = min(max(prob, 0.05), 0.95)
         es_smog = rng.random() < prob
 
-        if es_smog:
-            p = min(max(rng.betavariate(6, 2.2), 0.5), 0.995)
-        else:
-            p = min(max(rng.betavariate(1.8, 7), 0.005), 0.499)
-        p = round(p, 4)
-        clase = "smog" if p >= 0.5 else "sin_smog"
-        confianza = round(p if clase == "smog" else 1 - p, 4)
+        clase = "smog" if es_smog else "sin_smog"
+        # Sistema binario: el único número es la confianza de la predicción.
+        confianza = round(CONFIANZA_MIN + (CONFIANZA_MAX - CONFIANZA_MIN) * rng.betavariate(5, 2), 4)
+        p = confianza
         fname = rng.choice(pool_smog if es_smog else pool_sin)
 
         stats_zona[ub_id][0] += 1

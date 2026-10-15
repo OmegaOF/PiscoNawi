@@ -95,14 +95,13 @@ async def analizar_imagen_cnn_model_step(ruta_archivo: str) -> Dict[str, Any]:
 Analiza esta imagen de un vehículo y responde exclusivamente en JSON con el siguiente formato:
 {
   "smog_visible": true/false,
-  "porcentaje_smog": 0-100,
   "nivel_confianza": 0-100,
   "descripcion_corta": "descripción breve del estado del vehículo",
   "placa": "número de placa si es legible, sino 'undefined'"
 }
 
-Evalúa si hay presencia de humo negro (smog) en el escape del vehículo.
-El porcentaje_smog debe ser la estimación de intensidad del smog (0 = sin smog, 100 = smog muy intenso).
+smog_visible debe ser true si se observa humo saliendo del escape del vehículo
+(negro, gris o azulado, aunque sea leve); el vapor blanco tenue de arranque en frío no cuenta.
 El nivel_confianza debe indicar qué tan seguro estás de tu evaluación (0-100).
 Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefined".
 """
@@ -168,7 +167,6 @@ Si puedes leer la placa del vehículo, inclúyela; de lo contrario, usa "undefin
             logger.debug("respuesta no estructurada; se usa valor por defecto")
             analisis = {
                 "smog_visible": "smog" in content.lower() and "false" not in content.lower().split("smog")[1][:20] if "smog" in content.lower() else False,
-                "porcentaje_smog": 50,
                 "nivel_confianza": 70,
                 "descripcion_corta": content.replace('```json\n', '').replace('\n```', '').strip()[:200],
                 "placa": "undefined"

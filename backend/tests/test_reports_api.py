@@ -47,10 +47,11 @@ def seed_reportes(db, admin_user, analista_user):
             ubicacion_id=ub,
             dispositivo_captura_id=disp,
         )
+        confianza = round(max(p, 1 - p), 4)
         img.prediccion = Prediccion(
             clase_predicha=clase,
-            confianza=p if clase == "smog" else 1 - p,
-            p_smog=p,
+            confianza=confianza,
+            p_smog=confianza,
             fecha_prediccion=ts,
             observacion="t",
         )
@@ -135,10 +136,15 @@ def test_por_ciudad(client, datos, H):
 
 
 def test_top_capturas(client, datos, H):
-    r = client.get(f"/api/reports/top-capturas?{OCT}&limit=2&orden=p_smog", headers=H).json()
-    assert len(r) == 2 and r[0]["p_smog"] == 0.91
-    r2 = client.get(f"/api/reports/top-capturas?{OCT}&clase=sin_smog", headers=H).json()
-    assert r2 and all(x["clase_predicha"] == "sin_smog" for x in r2)
+    # Por defecto: solo detecciones con smog, de la más reciente a la más antigua.
+    r = client.get(f"/api/reports/top-capturas?{OCT}", headers=H).json()
+    assert r and all(x["clase_predicha"] == "smog" for x in r)
+    assert [x["fecha_prediccion"] for x in r] == sorted((x["fecha_prediccion"] for x in r), reverse=True)
+    assert "p_smog" not in r[0]
+    r2 = client.get(f"/api/reports/top-capturas?{OCT}&limit=2", headers=H).json()
+    assert len(r2) == 2
+    r3 = client.get(f"/api/reports/top-capturas?{OCT}&clase=sin_smog", headers=H).json()
+    assert r3 and all(x["clase_predicha"] == "sin_smog" for x in r3)
 
 
 def test_placas_reincidentes(client, datos, H):
@@ -147,11 +153,6 @@ def test_placas_reincidentes(client, datos, H):
     r2 = client.get(f"/api/reports/placas-reincidentes?{OCT}&min_total=1", headers=H).json()
     assert {x["placa"] for x in r2} == {"1234ABC", "9999ZZZ"}
     assert len(client.get(f"/api/reports/placas-reincidentes?{OCT}&min_total=1&limit=1", headers=H).json()) == 1
-
-
-def test_scatter_limit(client, datos, H):
-    r = client.get("/api/reports/scatter-confianza?limit=3", headers=H).json()
-    assert len(r) == 3 and set(r[0]) == {"p_smog", "confianza", "clase"}
 
 
 def test_comparativa_periodos(client, datos, H):
@@ -176,7 +177,20 @@ def test_resumen_ejecutivo(client, datos, H, monkeypatch):
 
 @pytest.mark.parametrize("path", [
     "heatmap-horas", "por-dispositivo", "por-ciudad", "top-capturas",
-    "placas-reincidentes", "scatter-confianza", "comparativa-periodos", "resumen-ejecutivo",
+    "placas-reincidentes", "comparativa-periodos", "resumen-ejecutivo",
 ])
 def test_nuevos_endpoints_prohibidos_para_operador(client, operator_token, auth_headers, path):
     assert client.get(f"/api/reports/{path}", headers=auth_headers(operator_token)).status_code == 403
+
+
+def test_umbrales_nivel_smog_binario():
+    """Sistema binario: Alto >30 %, Moderado 15-30 %, Bajo <=15 % (1 de cada 7 esperado)."""
+    from modules.reportes.utils_reportes import nivel_smog
+
+    assert nivel_smog(0.0, 0) == "Sin smog"
+    assert nivel_smog(12.0, 3) == "Bajo"
+    assert nivel_smog(15.0, 3) == "Bajo"
+    assert nivel_smog(15.1, 3) == "Moderado"
+    assert nivel_smog(30.0, 9) == "Moderado"
+    assert nivel_smog(30.1, 9) == "Alto"
+    assert nivel_smog(75.0, 9) == "Alto"

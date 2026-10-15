@@ -35,7 +35,6 @@ _require = require_roles(ROLES_REPORTES)
 
 DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 MIN_MUESTRA = 5  # mínimo de predicciones para declarar algo "crítico"
-SCATTER_MAX = 2000
 KPI_KEYS = [
     "total_imagenes",
     "total_predicciones",
@@ -65,7 +64,7 @@ class PorDispositivoItem(BaseModel):
     smog: int
     sin_smog: int
     pct_smog: float
-    p_smog_promedio: float
+    confianza_promedio: float
     nivel: str
 
 
@@ -85,7 +84,6 @@ class TopCapturaItem(BaseModel):
     imagen_id: int
     ruta_archivo: str
     placa_manual: Optional[str] = None
-    p_smog: float
     confianza: float
     clase_predicha: str
     fecha_prediccion: Optional[str] = None
@@ -100,12 +98,6 @@ class PlacaReincidenteItem(BaseModel):
     sin_smog: int
     pct_smog: float
     ultima_fecha: Optional[str] = None
-
-
-class ScatterPoint(BaseModel):
-    p_smog: float
-    confianza: float
-    clase: str
 
 
 class PeriodoRango(BaseModel):
@@ -174,7 +166,7 @@ def fetch_por_dispositivo(db: Session, f: ReportFilters) -> List[PorDispositivoI
             Imagen.dispositivo_captura_id.label("dispositivo_id"),
             func.count(Prediccion.id).label("total"),
             SMOG_SUM.label("smog"),
-            func.avg(Prediccion.p_smog).label("p_smog_prom"),
+            func.avg(Prediccion.confianza).label("confianza_prom"),
         )
         .join(Prediccion, Prediccion.imagen_id == Imagen.id)
         .filter(Imagen.dispositivo_captura_id.isnot(None))
@@ -188,7 +180,7 @@ def fetch_por_dispositivo(db: Session, f: ReportFilters) -> List[PorDispositivoI
         DispositivoCaptura.activo,
         total_col.label("total"),
         func.coalesce(sub.c.smog, 0).label("smog"),
-        sub.c.p_smog_prom,
+        sub.c.confianza_prom,
     ).outerjoin(sub, sub.c.dispositivo_id == DispositivoCaptura.id)
     if f.dispositivo_id is not None:
         q = q.filter(DispositivoCaptura.id == f.dispositivo_id)
@@ -206,7 +198,7 @@ def fetch_por_dispositivo(db: Session, f: ReportFilters) -> List[PorDispositivoI
                 smog=smog,
                 sin_smog=total - smog,
                 pct_smog=pct,
-                p_smog_promedio=round(float(r.p_smog_prom or 0), 4),
+                confianza_promedio=round(float(r.confianza_prom or 0), 4),
                 nivel=nivel_smog(pct, smog),
             )
         )
@@ -252,14 +244,13 @@ def fetch_por_ciudad(db: Session, f: ReportFilters) -> List[PorCiudadItem]:
 
 
 ORDEN_TOP = {
-    "p_smog": Prediccion.p_smog.desc(),
-    "confianza": Prediccion.confianza.desc(),
     "fecha": Prediccion.fecha_prediccion.desc(),
+    "confianza": Prediccion.confianza.desc(),
 }
 
 
 def fetch_top_capturas(
-    db: Session, f: ReportFilters, limit: int = 12, orden: str = "p_smog", clase: Optional[str] = None, solo_url: bool = True
+    db: Session, f: ReportFilters, limit: int = 12, orden: str = "fecha", clase: Optional[str] = "smog", solo_url: bool = True
 ) -> List[TopCapturaItem]:
     q = (
         db.query(
@@ -268,7 +259,6 @@ def fetch_top_capturas(
             Imagen.placa_manual,
             Imagen.ubicacion_id,
             Ubicacion.direccion,
-            Prediccion.p_smog,
             Prediccion.confianza,
             Prediccion.clase_predicha,
             Prediccion.fecha_prediccion,
@@ -281,13 +271,12 @@ def fetch_top_capturas(
         q = q.filter(Prediccion.clase_predicha == clase)
     if solo_url:
         q = q.filter(Imagen.ruta_archivo.like("http%"))
-    rows = q.order_by(ORDEN_TOP.get(orden, ORDEN_TOP["p_smog"]), Prediccion.id.desc()).limit(min(max(limit, 1), 100)).all()
+    rows = q.order_by(ORDEN_TOP.get(orden, ORDEN_TOP["fecha"]), Prediccion.id.desc()).limit(min(max(limit, 1), 100)).all()
     return [
         TopCapturaItem(
             imagen_id=r.id,
             ruta_archivo=r.ruta_archivo,
             placa_manual=r.placa_manual,
-            p_smog=round(float(r.p_smog or 0), 4),
             confianza=round(float(r.confianza or 0), 4),
             clase_predicha=r.clase_predicha,
             fecha_prediccion=_fmt_dt(r.fecha_prediccion),
@@ -327,15 +316,6 @@ def fetch_placas_reincidentes(db: Session, f: ReportFilters, limit: int = 10, mi
             )
         )
     return out
-
-
-def fetch_scatter(db: Session, f: ReportFilters, limit: int = SCATTER_MAX) -> List[ScatterPoint]:
-    q = db.query(Prediccion.p_smog, Prediccion.confianza, Prediccion.clase_predicha)
-    rows = f.apply_pred(q).order_by(Prediccion.id.desc()).limit(min(max(limit, 1), SCATTER_MAX)).all()
-    return [
-        ScatterPoint(p_smog=round(float(p or 0), 4), confianza=round(float(c or 0), 4), clase=k or "sin_clasificar")
-        for p, c, k in rows
-    ]
 
 
 def fetch_comparativa(db: Session, f: ReportFilters) -> ComparativaResponse:
@@ -442,12 +422,12 @@ async def get_top_capturas(
     db: Session = Depends(get_db),
     f: ReportFilters = Depends(report_filters),
     limit: int = Query(12, ge=1, le=100),
-    orden: str = Query("p_smog", pattern="^(p_smog|confianza|fecha)$"),
-    clase: Optional[str] = Query(None, pattern="^(smog|sin_smog)$"),
+    orden: str = Query("fecha", pattern="^(fecha|confianza)$"),
+    clase: Optional[str] = Query("smog", pattern="^(smog|sin_smog|todas)$"),
     solo_url: bool = Query(True),
 ):
-    """Capturas con mayor probabilidad de smog (galería)."""
-    return fetch_top_capturas(db, f, limit, orden, clase, solo_url)
+    """Detecciones con smog más recientes (galería)."""
+    return fetch_top_capturas(db, f, limit, orden, None if clase == "todas" else clase, solo_url)
 
 
 @router.get("/placas-reincidentes", response_model=List[PlacaReincidenteItem])
@@ -460,17 +440,6 @@ async def get_placas_reincidentes(
 ):
     """Placas detectadas varias veces, ordenadas por cantidad de detecciones con smog."""
     return fetch_placas_reincidentes(db, f, limit, min_total)
-
-
-@router.get("/scatter-confianza", response_model=List[ScatterPoint])
-async def get_scatter_confianza(
-    user: Usuario = Depends(_require),
-    db: Session = Depends(get_db),
-    f: ReportFilters = Depends(report_filters),
-    limit: int = Query(SCATTER_MAX, ge=1, le=SCATTER_MAX),
-):
-    """Puntos p_smog × confianza para gráfico de dispersión."""
-    return fetch_scatter(db, f, limit)
 
 
 @router.get("/comparativa-periodos", response_model=ComparativaResponse)

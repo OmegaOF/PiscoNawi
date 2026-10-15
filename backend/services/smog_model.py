@@ -50,10 +50,11 @@ def predict_smog(image_path: str) -> dict:
     if modo_simulado():
         p = max(0.0, min(1.0, DEBUG_P))
         clase = "smog" if p >= 0.5 else "sin_smog"
+        confianza = max(p, 1.0 - p)
         return {
             "clase_predicha": clase,
-            "p_smog": p,
-            "confianza": p if clase == "smog" else (1.0 - p),
+            "p_smog": confianza,
+            "confianza": confianza,
         }
 
     model = load_model_once()
@@ -68,10 +69,10 @@ def predict_smog(image_path: str) -> dict:
     p = max(0.0, min(1.0, p))
 
     clase = "smog" if p >= 0.5 else "sin_smog"
-    confianza = p if clase == "smog" else (1.0 - p)
+    confianza = max(p, 1.0 - p)
 
     return {
         "clase_predicha": clase,
-        "p_smog": p,
+        "p_smog": confianza,
         "confianza": confianza
     }

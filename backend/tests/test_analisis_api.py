@@ -41,7 +41,8 @@ def test_emisiones_retorna_prediccion_inicial(client, db, operator_user, operato
     items = body["items"]
     assert len(items) == 1
     assert items[0]["clase_predicha"] == "smog"
-    assert abs(items[0]["p_smog"] - 0.87) < 1e-6
+    assert abs(items[0]["confianza"] - 0.87) < 1e-6
+    assert "p_smog" not in items[0]
 
 
 def test_emisiones_ordenadas_recientes_primero_y_paginadas(client, db, operator_token, auth_headers):

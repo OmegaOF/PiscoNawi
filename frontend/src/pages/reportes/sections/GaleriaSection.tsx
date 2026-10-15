@@ -7,7 +7,6 @@ import ChartCard from '../../../components/reports/ChartCard';
 import Lightbox, { IMG_FALLBACK } from '../../../components/reports/Lightbox';
 import { usePresentation } from '../../../contexts/PresentationContext';
 import { fmtDateTime, fmtPct01 } from '../../../lib/format';
-import { nivelSmog } from '../../../lib/smog';
 import { LEVEL_COLORS } from '../../../lib/chartCtx';
 
 const GaleriaSection: React.FC<SectionProps> = ({ data }) => {
@@ -16,9 +15,9 @@ const GaleriaSection: React.FC<SectionProps> = ({ data }) => {
   const items = (data.topCapturas.data || []).slice(0, active ? 8 : 12);
 
   return (
-    <SectionWrap id="galeria" subtitle="Evidencia visual: capturas con mayor probabilidad de smog">
+    <SectionWrap id="galeria" subtitle="Evidencia visual: vehículos detectados con smog">
       <ChartCard
-        title="Capturas con mayor probabilidad de smog"
+        title="Detecciones con smog más recientes"
         subtitle="Clic en una imagen para ver el detalle"
         icon={PhotoIcon}
         loading={data.topCapturas.loading}
@@ -32,7 +31,7 @@ const GaleriaSection: React.FC<SectionProps> = ({ data }) => {
       >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {items.map((it, i) => {
-            const color = LEVEL_COLORS[nivelSmog(it.p_smog * 100)].dark;
+            const color = LEVEL_COLORS[it.clase_predicha === 'smog' ? 'alto' : 'bajo'].dark;
             return (
               <motion.button
                 key={it.imagen_id}
@@ -59,9 +58,10 @@ const GaleriaSection: React.FC<SectionProps> = ({ data }) => {
                   #{i + 1}
                 </span>
                 <div className="absolute inset-x-0 bottom-0 p-2 text-white sm:p-3">
-                  <p className="text-lg font-extrabold leading-none sm:text-2xl" style={{ color }}>
-                    {fmtPct01(it.p_smog, 0)}
+                  <p className="text-sm font-extrabold uppercase leading-none tracking-wide sm:text-base" style={{ color }}>
+                    {it.clase_predicha === 'smog' ? 'Con smog' : 'Sin smog'}
                   </p>
+                  <p className="mt-0.5 text-[11px] text-white/80">Confianza {fmtPct01(it.confianza, 0)}</p>
                   <p className="mt-1 font-mono text-[11px] font-semibold tracking-wider sm:text-xs">{it.placa_manual || 'Sin placa'}</p>
                   <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-white/80">
                     <MapPinIcon className="h-3 w-3 shrink-0" />

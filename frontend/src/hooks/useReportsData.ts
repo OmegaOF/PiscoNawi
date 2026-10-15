@@ -14,8 +14,6 @@ export function useReportsData(filters: ReportFilters, opts: { topLimit?: number
   const tendenciaDiaria = useSection(() => reportsApi.tendenciaDiaria(filters), keyNoGroup);
   const tendenciaImagenes = useSection(() => reportsApi.tendenciaImagenes(filters), key);
   const distConfianza = useSection(() => reportsApi.distConfianza(filters), keyNoGroup);
-  const distPSmog = useSection(() => reportsApi.distPSmog(filters), keyNoGroup);
-  const scatter = useSection(() => reportsApi.scatter(filters), keyNoGroup);
   const heatmap = useSection(() => reportsApi.heatmap(filters), keyNoGroup);
   const zonas = useSection(() => reportsApi.porUbicacion(filters), keyNoGroup);
   const dispositivos = useSection(() => reportsApi.porDispositivo(filters), keyNoGroup);
@@ -24,12 +22,12 @@ export function useReportsData(filters: ReportFilters, opts: { topLimit?: number
   const placas = useSection(() => reportsApi.placas(filters), keyNoGroup);
   const tabla = useSection(() => reportsApi.tablaResumen(filters), key);
 
-  const all = [kpis, comparativa, clase, tendencia, tendenciaDiaria, tendenciaImagenes, distConfianza, distPSmog, scatter, heatmap, zonas, dispositivos, usuarios, topCapturas, placas, tabla];
+  const all = [kpis, comparativa, clase, tendencia, tendenciaDiaria, tendenciaImagenes, distConfianza, heatmap, zonas, dispositivos, usuarios, topCapturas, placas, tabla];
   const anyLoading = all.some((s) => s.loading);
 
   return {
-    kpis, comparativa, clase, tendencia, tendenciaDiaria, tendenciaImagenes, distConfianza, distPSmog,
-    scatter, heatmap, zonas, dispositivos, usuarios, topCapturas, placas, tabla, anyLoading,
+    kpis, comparativa, clase, tendencia, tendenciaDiaria, tendenciaImagenes, distConfianza,
+    heatmap, zonas, dispositivos, usuarios, topCapturas, placas, tabla, anyLoading,
     reloadAll: () => all.forEach((s) => s.reload()),
   };
 }

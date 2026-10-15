@@ -40,7 +40,6 @@ export interface Comparativa {
 export interface ClaseItem { clase: string; cantidad: number }
 export interface TendenciaItem { periodo: string; total: number; smog: number; sin_smog: number }
 export interface Bucket { rango: string; cantidad: number }
-export interface ScatterPoint { p_smog: number; confianza: number; clase: string }
 export interface HeatCell { dia_semana: number; hora: number; total: number; smog: number; pct_smog: number }
 export interface ZonaItem {
   ubicacion_id: number;
@@ -56,7 +55,6 @@ export interface ZonaItem {
   departamento?: string | null;
   ciudad?: string | null;
   nivel?: string;
-  p_smog_promedio?: number;
 }
 export interface DispositivoItem {
   dispositivo_id: number;
@@ -67,7 +65,7 @@ export interface DispositivoItem {
   smog: number;
   sin_smog: number;
   pct_smog: number;
-  p_smog_promedio: number;
+  confianza_promedio: number;
   nivel?: string;
 }
 export interface UsuarioItem {
@@ -84,7 +82,6 @@ export interface CapturaTop {
   imagen_id: number;
   ruta_archivo: string;
   placa_manual: string | null;
-  p_smog: number;
   confianza: number;
   clase_predicha: string;
   fecha_prediccion: string | null;
@@ -98,7 +95,6 @@ export interface TablaRow {
   total_smog: number;
   pct_smog: number;
   confianza_promedio: number;
-  p_smog_promedio: number;
 }
 export interface DispositivoCatalogo { id: number; nombre_dispositivo: string; tipo_dispositivo?: string | null; activo?: boolean | null }
 
@@ -132,13 +128,11 @@ export const reportsApi = {
   tendenciaDiaria: (f: ReportFilters) => get<TendenciaItem[]>(`${R}/tendencia-predicciones`, { ...toParams(f), agrupar: 'dia' }),
   tendenciaImagenes: (f: ReportFilters) => get<TendenciaItem[]>(`${R}/tendencia-imagenes`, toParams(f, true)),
   distConfianza: (f: ReportFilters) => get<Bucket[]>(`${R}/distribucion-confianza`, toParams(f)),
-  distPSmog: (f: ReportFilters) => get<Bucket[]>(`${R}/distribucion-p-smog`, toParams(f)),
-  scatter: (f: ReportFilters) => get<ScatterPoint[]>(`${R}/scatter-confianza`, toParams(f)),
   heatmap: (f: ReportFilters) => get<HeatCell[]>(`${R}/heatmap-horas`, toParams(f)),
   porUbicacion: (f: ReportFilters) => get<ZonaItem[]>(`${R}/por-ubicacion`, toParams(f)),
   porDispositivo: (f: ReportFilters) => get<DispositivoItem[]>(`${R}/por-dispositivo`, toParams(f)),
   porUsuario: (f: ReportFilters) => get<UsuarioItem[]>(`${R}/por-usuario`, toParams(f)),
-  topCapturas: (f: ReportFilters, limit = 12) => get<CapturaTop[]>(`${R}/top-capturas`, { ...toParams(f), limit, orden: 'p_smog' }),
+  topCapturas: (f: ReportFilters, limit = 12) => get<CapturaTop[]>(`${R}/top-capturas`, { ...toParams(f), limit, orden: 'fecha', clase: 'smog' }),
   placas: (f: ReportFilters, limit = 20) => get<PlacaItem[]>(`${R}/placas-reincidentes`, { ...toParams(f), limit }),
   tablaResumen: (f: ReportFilters) => get<TablaRow[]>(`${R}/tabla-resumen`, toParams(f, true)),
   zonasCatalogo: () => get<ZonaItem[]>(`${R}/por-ubicacion`),

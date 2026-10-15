@@ -1,14 +1,17 @@
 import React from 'react';
-import { BeakerIcon, ChartBarIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { BeakerIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import SectionWrap from './SectionWrap';
 import { SectionProps } from './types';
 import ChartCard from '../../../components/reports/ChartCard';
 import EChart from '../../../components/reports/EChart';
 import { useSurface } from '../../../components/reports/surface';
 import { useChartCtx, usePresentation } from '../../../contexts/PresentationContext';
-import { histogramGroupedOption, separationOption } from '../../../lib/chartOptions';
+import { confianzaHistogramOption } from '../../../lib/chartOptions';
 import { fmtInt, fmtPct, fmtPct01 } from '../../../lib/format';
 import { cx } from '../../../lib/cx';
+
+/** Por debajo de este valor la predicción se considera poco confiable. */
+const CONFIANZA_BAJA = 0.6;
 
 const ModeloSection: React.FC<SectionProps> = ({ data }) => {
   const ctx = useChartCtx();
@@ -19,19 +22,18 @@ const ModeloSection: React.FC<SectionProps> = ({ data }) => {
   const sin = clase.find((c) => c.clase === 'sin_smog')?.cantidad ?? 0;
   const otros = clase.filter((c) => c.clase !== 'smog' && c.clase !== 'sin_smog').reduce((a, c) => a + c.cantidad, 0);
   const total = smog + sin + otros;
-  const scatter = data.scatter.data || [];
-  const dudosos = scatter.filter((p) => p.p_smog >= 0.45 && p.p_smog < 0.55).length;
   const conf = data.distConfianza.data || [];
-  const psmog = data.distPSmog.data || [];
+  const totalConf = conf.reduce((a, b) => a + b.cantidad, 0);
+  const bajas = conf.filter((b) => Number(b.rango.split('-')[1]) <= CONFIANZA_BAJA).reduce((a, b) => a + b.cantidad, 0);
 
   const tiles = [
-    { label: 'Clasificados con smog', value: fmtInt(smog), sub: total ? fmtPct((smog / total) * 100) : '—', tone: 'text-smog-alto' },
-    { label: 'Clasificados sin smog', value: fmtInt(sin), sub: total ? fmtPct((sin / total) * 100) : '—', tone: 'text-smog-bajo' },
+    { label: 'Con smog', value: fmtInt(smog), sub: total ? fmtPct((smog / total) * 100) : '—', tone: 'text-smog-alto' },
+    { label: 'Sin smog', value: fmtInt(sin), sub: total ? fmtPct((sin / total) * 100) : '—', tone: 'text-smog-bajo' },
     { label: 'Confianza promedio', value: fmtPct01(data.kpis.data?.confianza_promedio ?? null), sub: 'seguridad del modelo', tone: s.text },
     {
-      label: 'Casos dudosos',
-      value: fmtInt(dudosos),
-      sub: scatter.length ? `${fmtPct((dudosos / scatter.length) * 100)} con p_smog entre 45 % y 55 %` : '—',
+      label: 'Confianza baja',
+      value: fmtInt(bajas),
+      sub: totalConf ? `${fmtPct((bajas / totalConf) * 100)} por debajo del 60 %` : '—',
       tone: 'text-smog-moderado',
     },
   ];
@@ -47,55 +49,27 @@ const ModeloSection: React.FC<SectionProps> = ({ data }) => {
           </div>
         ))}
       </div>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <ChartCard
-          title="Distribución de confianza y probabilidad"
-          subtitle="Cantidad de predicciones por rango"
-          icon={ChartBarIcon}
-          loading={data.distConfianza.loading || data.distPSmog.loading}
-          hasData={!!data.distConfianza.data && !!data.distPSmog.data}
-          error={data.distConfianza.error || data.distPSmog.error}
-          onRetry={() => {
-            data.distConfianza.reload();
-            data.distPSmog.reload();
-          }}
-          empty={!!data.distConfianza.data && conf.every((b) => !b.cantidad) && psmog.every((b) => !b.cantidad)}
-          minHeight={320}
-          help={
-            <>
-              <p className="mb-2">
-                <strong>Confianza</strong>: qué tan seguro está el modelo de la clase que eligió.
-              </p>
-              <p>
-                <strong>p_smog</strong>: probabilidad que el modelo asigna a la clase “smog”. Si es 50 % o más, el vehículo se clasifica con smog.
-              </p>
-            </>
-          }
-        >
-          <EChart option={histogramGroupedOption(conf, psmog, ctx)} height={active ? 400 : 320} ariaLabel="Histograma de confianza y p_smog" />
-        </ChartCard>
-        <ChartCard
-          title="Separación entre clases"
-          subtitle={`Cómo reparte la CNN la probabilidad de smog · ${fmtInt(scatter.length)} predicciones recientes`}
-          icon={SparklesIcon}
-          loading={data.scatter.loading}
-          hasData={!!data.scatter.data}
-          error={data.scatter.error}
-          onRetry={data.scatter.reload}
-          empty={!!data.scatter.data && scatter.length === 0}
-          minHeight={320}
-          help={
-            <p>
-              Cada barra agrupa predicciones según la probabilidad de smog que asignó la red. Un buen modelo concentra los casos en los extremos (cerca de 0 % y 100 %). La franja
-              central marca los casos dudosos, cercanos al umbral de 50 %.
-            </p>
-          }
-        >
-          <EChart option={separationOption(scatter, ctx)} height={active ? 400 : 320} ariaLabel="Histograma de probabilidad de smog por clase" />
-        </ChartCard>
-      </div>
+      <ChartCard
+        title="Distribución de la confianza"
+        subtitle="Cantidad de predicciones por rango de confianza"
+        icon={ChartBarIcon}
+        loading={data.distConfianza.loading}
+        hasData={!!data.distConfianza.data}
+        error={data.distConfianza.error}
+        onRetry={data.distConfianza.reload}
+        empty={!!data.distConfianza.data && conf.every((b) => !b.cantidad)}
+        minHeight={320}
+        help={
+          <p>
+            El sistema entrega un resultado binario: con smog o sin smog. La <strong>confianza</strong> indica qué tan seguro está el modelo de esa decisión. Las predicciones por
+            debajo del 60 % conviene revisarlas a mano.
+          </p>
+        }
+      >
+        <EChart option={confianzaHistogramOption(conf, ctx)} height={active ? 420 : 340} ariaLabel="Histograma de confianza" />
+      </ChartCard>
       <p className={cx('mt-3 flex items-center gap-1.5 text-xs', s.muted)}>
-        <BeakerIcon className="h-4 w-4" /> Clasificación binaria: p_smog ≥ 50 % → con smog; confianza = p_smog o 1 − p_smog según la clase.
+        <BeakerIcon className="h-4 w-4" /> Clasificación binaria: cada vehículo queda como “con smog” o “sin smog”, acompañado de la confianza de esa decisión.
       </p>
     </SectionWrap>
   );

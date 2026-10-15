@@ -24,7 +24,6 @@ class AnalisisItem(BaseModel):
     placa_manual: Optional[str]
     clase_predicha: str
     confianza: float
-    p_smog: float
     observacion: Optional[str]
     fecha_prediccion: str
 
@@ -56,7 +55,6 @@ async def obtener_analisis_emisiones(
             Imagen.placa_manual,
             Prediccion.clase_predicha,
             Prediccion.confianza,
-            Prediccion.p_smog,
             Prediccion.observacion,
             Prediccion.fecha_prediccion,
         )
@@ -76,7 +74,6 @@ async def obtener_analisis_emisiones(
             placa_manual=row.placa_manual,
             clase_predicha=row.clase_predicha,
             confianza=float(row.confianza or 0),
-            p_smog=float(row.p_smog or 0),
             observacion=row.observacion,
             fecha_prediccion=row.fecha_prediccion.strftime("%Y-%m-%d %H:%M:%S") if row.fecha_prediccion else "",
         )
@@ -103,8 +100,9 @@ async def analizar_con_ia(
     try:
         resultado = await analizar_imagen_cnn_model_step(imagen.ruta_archivo)
         prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
-        prediccion.confianza = resultado["nivel_confianza"] / 100.0
-        prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
+        confianza = resultado["nivel_confianza"] / 100.0
+        prediccion.confianza = confianza
+        prediccion.p_smog = confianza
         prediccion.observacion = '-'
 
         db.commit()
@@ -301,8 +299,9 @@ async def analizar_todas_imagenes_hoy(
 
             resultado = await analizar_imagen_cnn_model_step(imagen.ruta_archivo)
             prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
-            prediccion.confianza = resultado["nivel_confianza"] / 100.0
-            prediccion.p_smog = resultado["porcentaje_smog"] / 100.0
+            confianza = resultado["nivel_confianza"] / 100.0
+            prediccion.confianza = confianza
+            prediccion.p_smog = confianza
             prediccion.observacion = MARCA_REVISADA
             prediccion.fecha_prediccion = func.now()
             db.commit()  # Se guarda una por una: un fallo posterior no deshace lo ya revisado

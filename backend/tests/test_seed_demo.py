@@ -33,8 +33,10 @@ def test_run_seed_inserta_y_es_consistente(db):
     assert len(preds) == 120
     for p in preds:
         img = p.imagen
-        assert (p.p_smog >= 0.5) == (p.clase_predicha == "smog")
-        assert abs(p.confianza - (p.p_smog if p.clase_predicha == "smog" else 1 - p.p_smog)) < 1e-6
+        # Sistema binario: la clase viene del perfil de la zona y p_smog guarda la confianza.
+        assert p.clase_predicha in ("smog", "sin_smog")
+        assert abs(p.confianza - p.p_smog) < 1e-6
+        assert 0.60 <= p.confianza <= 0.97
         assert img.fecha_subida <= p.fecha_prediccion
         assert img.ruta_archivo.endswith("?demo=1")
         assert img.filename_original.startswith("demo_")

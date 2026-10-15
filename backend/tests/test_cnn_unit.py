@@ -53,7 +53,8 @@ def test_prediccion_smog_clasifica_como_no_smog(monkeypatch):
     result = smog_model.predict_smog("dummy.jpg")
 
     assert result["clase_predicha"] == "sin_smog"
-    assert abs(result["p_smog"] - 0.10) < 1e-6
+    # Sistema binario: p_smog guarda la misma confianza de la predicción.
+    assert abs(result["p_smog"] - 0.90) < 1e-6
     assert abs(result["confianza"] - 0.90) < 1e-6
 
 
@@ -88,5 +89,5 @@ def test_modo_simulado_devuelve_prediccion_coherente(monkeypatch):
     result = smog_model.predict_smog("no-existe.jpg")
 
     assert result["clase_predicha"] == "sin_smog"
-    assert abs(result["p_smog"] - 0.12) < 1e-6
+    assert abs(result["p_smog"] - 0.88) < 1e-6
     assert abs(result["confianza"] - 0.88) < 1e-6

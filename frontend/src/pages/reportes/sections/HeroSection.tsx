@@ -47,7 +47,7 @@ const HeroSection: React.FC<SectionProps> = ({ data, filters, rangeLabel }) => {
           help={
             <>
               <p className="mb-2">El medidor muestra qué porcentaje de los vehículos analizados fue clasificado con smog por la red neuronal.</p>
-              <p>Verde: menos de 30 % · Ámbar: 30 % a 60 % · Rojo: más de 60 %.</p>
+              <p>Verde: hasta 15 % · Ámbar: 15 % a 30 % · Rojo: más de 30 %.</p>
             </>
           }
         >

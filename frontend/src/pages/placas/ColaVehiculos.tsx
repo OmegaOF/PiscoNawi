@@ -4,7 +4,6 @@ import { ChevronLeftIcon, ChevronRightIcon, MapPinIcon } from '@heroicons/react/
 import { VehiculoPlaca } from '../../lib/placasApi';
 import { IMG_FALLBACK } from '../../components/reports/Lightbox';
 import { fmtDateTime, fmtInt, fmtPct01 } from '../../lib/format';
-import { nivelSmog } from '../../lib/smog';
 import { LEVEL_COLORS } from '../../lib/chartCtx';
 import { cx } from '../../lib/cx';
 
@@ -46,7 +45,7 @@ const ColaVehiculos: React.FC<Props> = ({ items, selId, onSelect, total, page, s
       <div className="flex items-center justify-between border-b border-neutral-border px-4 py-3">
         <div>
           <h2 className="font-semibold text-text-dark">Cola de vehículos</h2>
-          <p className="text-xs text-text-muted">{fmtInt(total)} en esta vista · mayor probabilidad de smog primero</p>
+          <p className="text-xs text-text-muted">{fmtInt(total)} en esta vista · más recientes primero</p>
         </div>
       </div>
       <div
@@ -61,7 +60,7 @@ const ColaVehiculos: React.FC<Props> = ({ items, selId, onSelect, total, page, s
         <AnimatePresence initial={false}>
           {items.map((it) => {
             const activo = it.imagen_id === selId;
-            const color = LEVEL_COLORS[nivelSmog(it.p_smog * 100)].light;
+            const color = LEVEL_COLORS[it.clase_predicha === 'smog' ? 'alto' : 'bajo'].light;
             return (
               <motion.button
                 key={it.imagen_id}
@@ -90,8 +89,9 @@ const ColaVehiculos: React.FC<Props> = ({ items, selId, onSelect, total, page, s
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-lg font-extrabold leading-none" style={{ color }}>
-                      {fmtPct01(it.p_smog, 0)}
+                    <span className="text-sm font-extrabold uppercase leading-none tracking-wide" style={{ color }}>
+                      {it.clase_predicha === 'smog' ? 'Con smog' : 'Sin smog'}
+                      <span className="ml-1.5 text-xs font-semibold normal-case tracking-normal text-text-muted">{fmtPct01(it.confianza, 0)}</span>
                     </span>
                     {it.placa_manual ? (
                       <span className="rounded border-2 border-text-dark/70 px-1.5 font-mono text-xs font-bold tracking-widest text-text-dark">{it.placa_manual}</span>

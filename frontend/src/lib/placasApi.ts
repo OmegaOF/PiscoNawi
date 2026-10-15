@@ -9,7 +9,6 @@ export interface VehiculoPlaca {
   filename_original: string;
   placa_manual: string | null;
   clase_predicha: string | null;
-  p_smog: number;
   confianza: number;
   fecha_prediccion: string | null;
   ubicacion_id: number | null;
@@ -39,7 +38,7 @@ export interface PlacasListParams {
   estado?: EstadoPlaca;
   clase?: ClasePlaca;
   q?: string;
-  orden?: 'p_smog' | 'fecha';
+  orden?: 'fecha' | 'confianza';
   page?: number;
   size?: number;
   desde?: string;

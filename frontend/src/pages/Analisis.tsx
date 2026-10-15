@@ -10,7 +10,6 @@ interface AnalisisItem {
   placa_manual: string | null;
   clase_predicha: string;
   confianza: number;
-  p_smog: number;
   observacion: string | null;
   fecha_prediccion: string;
 }
@@ -66,10 +65,6 @@ const Analisis: React.FC = () => {
     return `${(confidence * 100).toFixed(2)}%`;
   };
 
-  const formatSmogPercentage = (pSmog: number) => {
-    return `${(pSmog * 100).toFixed(2)}%`;
-  };
-
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <div className="px-4 py-6 sm:px-0">
@@ -111,9 +106,6 @@ const Analisis: React.FC = () => {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Confianza
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Prob. de smog
                     </th>
                   </tr>
                 </thead>
@@ -163,9 +155,6 @@ const Analisis: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatConfidence(item.confianza)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatSmogPercentage(item.p_smog)}
                       </td>
                     </tr>
                   ))}
