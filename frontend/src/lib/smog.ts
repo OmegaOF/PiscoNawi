@@ -6,6 +6,13 @@ export type Nivel = 'alto' | 'moderado' | 'bajo' | 'sin';
 export const UMBRAL_ALTO = 30;
 export const UMBRAL_MODERADO = 15;
 
+/**
+ * Registros mínimos para que una franja día × hora pueda declararse la más crítica
+ * o la más limpia. Con pocas muestras el porcentaje es ruido: 6 de 9 (67 %) no dice
+ * más que 35 de 53 (66 %), pero ganaría el desempate por decimales.
+ */
+export const MIN_MUESTRA_FRANJA = 12;
+
 /** Mismos umbrales que el backend (utils_reportes.nivel_smog). */
 export function nivelSmog(pct: number, smog?: number | null): Nivel {
   if (smog != null && smog <= 0) return 'sin';
@@ -67,7 +74,7 @@ export function buildConclusion({ kpis, zonas, heatmap, rangeLabel }: Conclusion
     const peor = zonasValidas.reduce((a, b) => (b.pct_smog > a.pct_smog ? b : a));
     partes.push(`La zona más crítica fue ${etiquetaZona(peor)} (${fmtPct(peor.pct_smog, 0)}).`);
   }
-  const celdas = (heatmap || []).filter((c) => c.total >= 3);
+  const celdas = (heatmap || []).filter((c) => c.total >= MIN_MUESTRA_FRANJA);
   if (celdas.length) {
     const pico = celdas.reduce((a, b) => (b.pct_smog > a.pct_smog || (b.pct_smog === a.pct_smog && b.total > a.total) ? b : a));
     partes.push(`El momento con más smog fue el ${DIAS_LARGOS[pico.dia_semana]} a las ${fmtHora(pico.hora)}.`);

@@ -9,12 +9,11 @@ import { useChartCtx, usePresentation } from '../../../contexts/PresentationCont
 import { hourHeatmapOption } from '../../../lib/chartOptions';
 import { DIAS_LARGOS, fmtHora, fmtInt, fmtPct } from '../../../lib/format';
 import { HeatCell } from '../../../lib/reportsApi';
+import { MIN_MUESTRA_FRANJA } from '../../../lib/smog';
 import { cx } from '../../../lib/cx';
 
-// Muestra mínima para declarar una franja "más crítica" o "más limpia".
-// Con pocos registros el porcentaje es ruido: 6 de 9 (67 %) no dice más que
-// 35 de 53 (66 %), pero ganaría el desempate por decimales.
-const MIN = 12;
+// Mismo criterio de muestra mínima que usa la conclusión automática.
+const MIN = MIN_MUESTRA_FRANJA;
 
 const PatronHorarioSection: React.FC<SectionProps> = ({ data }) => {
   const ctx = useChartCtx();
