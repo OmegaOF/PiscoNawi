@@ -11,9 +11,10 @@ import { DIAS_LARGOS, fmtHora, fmtInt, fmtPct } from '../../../lib/format';
 import { HeatCell } from '../../../lib/reportsApi';
 import { cx } from '../../../lib/cx';
 
-// Muestra mínima para declarar una franja "más crítica" o "más limpia":
-// con 3 o 4 registros un 0 % es ruido, no una señal.
-const MIN = 8;
+// Muestra mínima para declarar una franja "más crítica" o "más limpia".
+// Con pocos registros el porcentaje es ruido: 6 de 9 (67 %) no dice más que
+// 35 de 53 (66 %), pero ganaría el desempate por decimales.
+const MIN = 12;
 
 const PatronHorarioSection: React.FC<SectionProps> = ({ data }) => {
   const ctx = useChartCtx();

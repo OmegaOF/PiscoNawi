@@ -60,6 +60,7 @@ from seed_demo import (
     HORA_PESO_MEDIA,
     HORA_SMOG_DELTA,
     VENTANA_CRITICA,
+    VENTANA_CRITICA_BASE_MINIMA,
     VENTANA_CRITICA_VOLUMEN,
     VENTANA_LIMPIA,
     VENTANA_LIMPIA_VOLUMEN,
@@ -367,7 +368,7 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
         )
         clave_hora = (ts.weekday(), hora)
         factor_limpio = VENTANA_LIMPIA.get(clave_hora, 1.0)
-        prob_critica = VENTANA_CRITICA.get(clave_hora)
+        prob_critica = VENTANA_CRITICA.get(clave_hora) if base >= VENTANA_CRITICA_BASE_MINIMA else None
         if factor_limpio < 1.0:
             # Ventana limpia del domingo: sin piso, para que sea el mínimo claro de la semana.
             prob = min(prob * factor_limpio, 0.95)

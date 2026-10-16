@@ -101,9 +101,12 @@ PROB_SMOG_MINIMA = 0.01
 # Ventana más crítica de la semana: miércoles al final de la tarde (pico a las 18:00).
 # Clave (dia_semana 0=lunes, hora) -> factor que multiplica la probabilidad de smog de la zona,
 # de modo que las zonas limpias siguen siendo las menos contaminadas también en esa franja.
-VENTANA_CRITICA = {(2, 17): 1.8, (2, 18): 3.0, (2, 19): 1.8}
+VENTANA_CRITICA = {(2, 17): 1.6, (2, 18): 2.6, (2, 19): 1.6}
+# La hora crítica es un embotellamiento en avenidas congestionadas: no afecta a las zonas
+# tranquilas, así que solo se aplica donde la probabilidad base de la zona llega a este valor.
+VENTANA_CRITICA_BASE_MINIMA = 0.10
 # Volumen reforzado para que la franja tenga muestra suficiente y el porcentaje sea estable.
-VENTANA_CRITICA_VOLUMEN = {(2, 17): 3.0, (2, 18): 7.0, (2, 19): 3.0}
+VENTANA_CRITICA_VOLUMEN = {(2, 17): 3.0, (2, 18): 11.0, (2, 19): 3.0}
 MES_SMOG_DELTA = {4: -.05, 5: -.02, 6: .02, 7: .06, 8: .08, 9: .05, 10: .0}  # estación seca peor
 VOLUMEN_INICIAL, VOLUMEN_FINAL = 0.8, 1.2
 CONFIANZA_MIN, CONFIANZA_MAX = 0.60, 0.97
@@ -279,7 +282,7 @@ def run_seed(
         )
         clave_hora = (ts.weekday(), hora)
         factor_limpio = VENTANA_LIMPIA.get(clave_hora, 1.0)
-        prob_critica = VENTANA_CRITICA.get(clave_hora)
+        prob_critica = VENTANA_CRITICA.get(clave_hora) if ZONAS[ub_id][1] >= VENTANA_CRITICA_BASE_MINIMA else None
         if factor_limpio < 1.0:
             prob = min(prob * factor_limpio, 0.95)
         elif prob_critica is not None:
