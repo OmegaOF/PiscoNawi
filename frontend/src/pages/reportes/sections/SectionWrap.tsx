@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import SectionHeader from '../../../components/reports/SectionHeader';
+import ErrorBoundary from '../../../components/reports/ErrorBoundary';
 import { usePresentation } from '../../../contexts/PresentationContext';
 import { SectionId, sectionMeta } from '../sections';
 import { cx } from '../../../lib/cx';
@@ -28,7 +29,7 @@ const SectionWrap: React.FC<SectionWrapProps> = ({ id, subtitle, right, children
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
       <SectionHeader index={meta.index} title={meta.label} subtitle={subtitle} icon={meta.icon} right={right} />
-      {children}
+      <ErrorBoundary minHeight={0}>{children}</ErrorBoundary>
     </motion.section>
   );
 };

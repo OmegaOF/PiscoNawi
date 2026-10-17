@@ -75,9 +75,9 @@ HORA_PESO_MEDIA = [
     1.10, 1.10,  # 14:00  14:30
     1.20, 1.30,  # 15:00  15:30
     1.50, 1.70,  # 16:00  16:30
-    1.90, 3.20,  # 17:00  17:30 <- pico
-    3.40, 3.30,  # 18:00  18:30 <- pico
-    2.00, 1.60,  # 19:00  19:30
+    1.90, 2.40,  # 17:00  17:30 <- pico
+    2.50, 2.40,  # 18:00  18:30 <- pico
+    1.90, 1.60,  # 19:00  19:30
     1.20, 1.00,  # 20:00  20:30
     0.80, 0.70,  # 21:00  21:30
     0.50, 0.40,  # 22:00  22:30
@@ -91,10 +91,10 @@ DIA_PESO = [1.0, 1.0, 1.0, 1.0, 1.1, 0.6, 0.35]  # lunes..domingo
 DIA_SMOG_DELTA = {5: -0.05, 6: -0.07}
 # Ventana más limpia de la semana: domingo por la tarde (mínimo a las 15:00).
 # Clave (dia_semana 0=lunes, hora) -> factor que multiplica la probabilidad de smog.
-VENTANA_LIMPIA = {(6, 13): 0.25, (6, 14): 0.10, (6, 15): 0.04, (6, 16): 0.10, (6, 17): 0.30}
+VENTANA_LIMPIA = {(6, 12): 0.30, (6, 13): 0.20, (6, 14): 0.08, (6, 15): 0.0, (6, 16): 0.08, (6, 17): 0.25}
 # Se refuerza el volumen del domingo en esa franja para que la celda tenga muestras suficientes
 # y el "momento más limpio" no lo decida el azar de una celda con 3 registros.
-VENTANA_LIMPIA_VOLUMEN = {(6, 13): 6.0, (6, 14): 12.0, (6, 15): 26.0, (6, 16): 12.0, (6, 17): 6.0}
+VENTANA_LIMPIA_VOLUMEN = {(6, 12): 3.0, (6, 13): 5.0, (6, 14): 8.0, (6, 15): 18.0, (6, 16): 8.0, (6, 17): 5.0}
 # Probabilidad mínima de smog fuera de la ventana limpia: mantiene las demás franjas
 # por encima de cero para que el "momento más limpio" no lo decida el azar.
 PROB_SMOG_MINIMA = 0.01
@@ -106,9 +106,20 @@ VENTANA_CRITICA = {(2, 17): 1.6, (2, 18): 2.6, (2, 19): 1.6}
 # tranquilas, así que solo se aplica donde la probabilidad base de la zona llega a este valor.
 VENTANA_CRITICA_BASE_MINIMA = 0.10
 # Volumen reforzado para que la franja tenga muestra suficiente y el porcentaje sea estable.
-VENTANA_CRITICA_VOLUMEN = {(2, 17): 3.0, (2, 18): 11.0, (2, 19): 3.0}
+VENTANA_CRITICA_VOLUMEN = {(2, 17): 1.3, (2, 18): 2.0, (2, 19): 1.3}
 MES_SMOG_DELTA = {4: -.05, 5: -.02, 6: .02, 7: .06, 8: .08, 9: .05, 10: .0}  # estación seca peor
 VOLUMEN_INICIAL, VOLUMEN_FINAL = 0.8, 1.2
+
+# --- Jornadas de campo -------------------------------------------------------
+# Las capturas las toma un estudiante, no una cámara fija 24/7: solo hay datos en
+# horario accesible, en los días que salió a campo y durante unas pocas horas de cada día.
+HORA_CAMPO_INICIO, HORA_CAMPO_FIN = 7, 22  # franja utilizable (22 = última hora con capturas)
+# Probabilidad de salir a campo según el día de la semana (lunes..domingo).
+# Se saltan bastantes martes, jueves y sábados; el domingo se sale poco.
+PROB_SALIDA_DIA = [0.70, 0.45, 0.75, 0.40, 0.65, 0.45, 0.80]
+# Bloques de horas seguidas que dura una jornada (p. ej. 2 a 4 horas de pie en la avenida).
+BLOQUES_POR_JORNADA = (1, 2)      # cuántos tramos separados por día
+HORAS_POR_BLOQUE = (2, 4)         # duración de cada tramo, en horas
 CONFIANZA_MIN, CONFIANZA_MAX = 0.60, 0.97
 
 USUARIOS_PESO = {
@@ -144,6 +155,34 @@ def _demo_imagen_ids(db) -> List[int]:
 
 def contar_demo(db) -> int:
     return len(_demo_imagen_ids(db))
+
+
+def planificar_jornadas(dias, rng, ventanas_obligatorias=()):
+    """Decide en qué días hubo salida a campo y qué horas se cubrieron en cada una.
+
+    Devuelve {fecha: [horas cubiertas]}. Los días sin salida no aparecen.
+    `ventanas_obligatorias` son pares (dia_semana, hora) que siempre deben quedar
+    cubiertos cuando ese día tiene salida, para no perder las franjas clave.
+    """
+    por_dia_obligatorio = defaultdict(set)
+    for dia_semana, hora in ventanas_obligatorias:
+        por_dia_obligatorio[dia_semana].add(hora)
+
+    jornadas = {}
+    for d in dias:
+        if rng.random() > PROB_SALIDA_DIA[d.weekday()]:
+            continue  # ese día no se salió a campo
+        horas = set()
+        for _ in range(rng.randint(*BLOQUES_POR_JORNADA)):
+            largo = rng.randint(*HORAS_POR_BLOQUE)
+            inicio = rng.randint(HORA_CAMPO_INICIO, max(HORA_CAMPO_INICIO, HORA_CAMPO_FIN - largo + 1))
+            horas.update(range(inicio, min(inicio + largo, HORA_CAMPO_FIN + 1)))
+        obligatorias = por_dia_obligatorio.get(d.weekday())
+        if obligatorias:
+            horas.update(obligatorias)
+        if horas:
+            jornadas[d] = sorted(horas)
+    return jornadas
 
 
 def clean_demo(db) -> Dict[str, int]:

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { MapPinIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import SectionWrap from './SectionWrap';
 import { SectionProps } from './types';
@@ -20,9 +20,20 @@ const MapaSection: React.FC<SectionProps> = ({ data }) => {
   const s = useSurface();
   const { active } = usePresentation();
   const [selected, setSelected] = useState<number | null>(null);
-  const zonas = data.zonas.data || [];
-  const ranking = zonas.map(zonaToRank).sort((a, b) => b.pct - a.pct);
+  const zonas = useMemo(() => data.zonas.data || [], [data.zonas.data]);
+  const ranking = useMemo(() => zonas.map(zonaToRank).sort((a, b) => b.pct - a.pct), [zonas]);
   const height = active ? '62vh' : '100%';
+  const opcionRanking = useMemo(() => rankingBarOption(ranking, ctx), [ranking, ctx]);
+  // Se resuelve por nombre de la barra, no por posición: el índice puede venir de un
+  // render anterior si los datos cambiaron mientras el puntero estaba sobre el gráfico.
+  const alElegirZona = useCallback(
+    (p: { dataIndex: number; name?: string }) => {
+      const zona = ranking.find((z) => z.label === p.name) ?? ranking[p.dataIndex];
+      setSelected(zona?.id ?? null);
+    },
+    [ranking],
+  );
+  const eventosRanking = useMemo(() => ({ click: alElegirZona }), [alElegirZona]);
 
   return (
     <SectionWrap id="mapa" subtitle="Dónde se concentra el smog en el área metropolitana de Cochabamba">
@@ -69,9 +80,9 @@ const MapaSection: React.FC<SectionProps> = ({ data }) => {
           help={<p>Las líneas verticales marcan los umbrales de 15 % (moderado) y 30 % (alto).</p>}
         >
           <EChart
-            option={rankingBarOption(ranking, ctx)}
+            option={opcionRanking}
             height={Math.max(220, ranking.length * 46)}
-            onEvents={{ click: (p: { dataIndex: number }) => setSelected(ranking[p.dataIndex]?.id ?? null) }}
+            onEvents={eventosRanking}
             ariaLabel="Ranking de zonas por porcentaje de smog"
           />
           <ul className={cx('mt-3 divide-y text-sm', s.dark ? 'divide-pres-border' : 'divide-neutral-border')}>

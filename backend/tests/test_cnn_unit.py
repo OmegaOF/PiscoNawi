@@ -91,3 +91,20 @@ def test_modo_simulado_devuelve_prediccion_coherente(monkeypatch):
     assert result["clase_predicha"] == "sin_smog"
     assert abs(result["p_smog"] - 0.88) < 1e-6
     assert abs(result["confianza"] - 0.88) < 1e-6
+
+
+def test_imagen_nueva_guarda_dispositivo_de_captura(db):
+    """Al crear la fila de una imagen se debe registrar con qué dispositivo se capturó."""
+    from db import DispositivoCaptura
+    from services.cnn_queue import _ensure_image_row
+
+    db.add(DispositivoCaptura(id=1, nombre_dispositivo="Cámara de prueba", activo=True))
+    db.commit()
+
+    nueva = _ensure_image_row(db, "/tmp/vehicle_4242.jpg", ubicacion_id=None, user_id=None, dispositivo_id=1)
+    assert nueva.dispositivo_captura_id == 1
+
+    # Al reprocesar la misma imagen se conserva el dispositivo.
+    repetida = _ensure_image_row(db, "/tmp/vehicle_4242.jpg", ubicacion_id=None, user_id=None, dispositivo_id=1)
+    assert repetida.id == nueva.id
+    assert repetida.dispositivo_captura_id == 1

@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from PIL import Image as PILImage, ImageOps
+from sqlalchemy.exc import IntegrityError
 
 from db import (
     Ciudad,
@@ -59,6 +60,8 @@ from seed_demo import (
     FRANJA_MIN,
     HORA_PESO_MEDIA,
     HORA_SMOG_DELTA,
+    HORA_CAMPO_FIN,
+    HORA_CAMPO_INICIO,
     VENTANA_CRITICA,
     VENTANA_CRITICA_BASE_MINIMA,
     VENTANA_CRITICA_VOLUMEN,
@@ -71,6 +74,7 @@ from seed_demo import (
     _gen_placa,
     asignar_ciudades_faltantes,
     clean_demo,
+    planificar_jornadas,
 )
 
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -97,31 +101,31 @@ CIUDADES = [
 
 # Zonas de captura: (nombre corto, direccion, departamento, latitud, longitud)
 ZONAS = [
-    ("Calle Manuela Ferrufino", "Calle Manuela Ferrufino, 6 de Agosto, Canata, Cochabamba, Cercado, Cochabamba, Bolivia", "Cochabamba", -17.41573, -66.15749),
-    ("Av. América", "Av. América", "Cochabamba", -17.39350, -66.15700),
-    ("Quillacollo Centro", "Quillacollo Centro", "Cochabamba", -17.39200, -66.27800),
-    ("Sacaba Plaza", "Sacaba Plaza", "Cochabamba", -17.39700, -66.03800),
-    ("Tiquipaya Centro", "Tiquipaya Centro", "Cochabamba", -17.33800, -66.21500),
-    ("Colcapirhua Zona Sur", "Colcapirhua Zona Sur", "Cochabamba", -17.38000, -66.24500),
-    ("Centro Heroínas Ayacucho", "Centro Heroínas Ayacucho, Cercado", "Cochabamba", -17.39195, -66.15870),
-    ("Av. Blanco Galindo", "Av. Blanco Galindo Km 4, Cercado", "Cochabamba", -17.38960, -66.19650),
-    ("Cala Cala", "Cala Cala, Cercado", "Cochabamba", -17.37320, -66.15890),
+    ("6 de Agosto y Panamericana", "6 de Agosto y Panamericana, Cercado", "Cochabamba", -17.4157300, -66.1574900),
+    ("Av. América", "Av. América", "Cochabamba", -17.3722446, -66.1643151),
+    ("Quillacollo Centro", "Quillacollo Centro", "Cochabamba", -17.3939185, -66.2811640),
+    ("Sacaba Plaza", "Sacaba Plaza", "Cochabamba", -17.4041552, -66.0404324),
+    ("Tiquipaya Centro", "Tiquipaya Centro", "Cochabamba", -17.3374009, -66.2210755),
+    ("Colcapirhua Zona Sur", "Colcapirhua Zona Sur", "Cochabamba", -17.3908891, -66.2382233),
+    ("Centro Heroínas Ayacucho", "Centro Heroínas Ayacucho, Cercado", "Cochabamba", -17.3930272, -66.1606105),
+    ("Av. Blanco Galindo", "Av. Blanco Galindo Km 4, Cercado", "Cochabamba", -17.3917324, -66.2245591),
+    ("Cala Cala", "Cala Cala, Cercado", "Cochabamba", -17.3729836, -66.1687288),
 ]
 
 # Perfil por zona (clave = dirección): (peso_volumen, prob_smog_base, nombre de la cámara)
 # Rojas (>30 % con smog): Quillacollo, Heroínas, Blanco Galindo.
 # Naranjas (15-30 %): Av. América, Sacaba, Colcapirhua, Cala Cala.
-# Verdes (<=15 %): Manuela Ferrufino, Tiquipaya.
+# Verdes (<=15 %): 6 de Agosto y Panamericana, Tiquipaya.
 PERFIL_ZONAS = {
-    "Calle Manuela Ferrufino, 6 de Agosto, Canata, Cochabamba, Cercado, Cochabamba, Bolivia": (0.17, 0.03, "Cámara Calle Manuela Ferrufino"),
-    "Av. América": (0.17, 0.14, "Cámara Av. América"),
-    "Quillacollo Centro": (0.09, 0.45, "Cámara Quillacollo Centro"),
-    "Sacaba Plaza": (0.11, 0.20, "Cámara Sacaba"),
+    "6 de Agosto y Panamericana, Cercado": (0.17, 0.03, "Cámara 6 de Agosto y Panamericana"),
+    "Av. América": (0.17, 0.12, "Cámara Av. América"),
+    "Quillacollo Centro": (0.09, 0.40, "Cámara Quillacollo Centro"),
+    "Sacaba Plaza": (0.11, 0.19, "Cámara Sacaba"),
     "Tiquipaya Centro": (0.12, 0.03, "Cámara Tiquipaya"),
-    "Colcapirhua Zona Sur": (0.09, 0.13, "Cámara Colcapirhua Zona Sur"),
-    "Centro Heroínas Ayacucho, Cercado": (0.08, 0.36, "Cámara Heroínas y Ayacucho"),
-    "Av. Blanco Galindo Km 4, Cercado": (0.08, 0.31, "Cámara Av. Blanco Galindo"),
-    "Cala Cala, Cercado": (0.09, 0.15, "Cámara Cala Cala"),
+    "Colcapirhua Zona Sur": (0.09, 0.12, "Cámara Colcapirhua Zona Sur"),
+    "Centro Heroínas Ayacucho, Cercado": (0.08, 0.32, "Cámara Heroínas y Ayacucho"),
+    "Av. Blanco Galindo Km 4, Cercado": (0.08, 0.27, "Cámara Av. Blanco Galindo"),
+    "Cala Cala, Cercado": (0.09, 0.11, "Cámara Cala Cala"),
 }
 NOMBRE_CORTO = {direccion: corto for corto, direccion, _, _, _ in ZONAS}
 
@@ -244,6 +248,14 @@ def asegurar_zonas(db, dry_run: bool) -> Dict[str, int]:
             db.commit()
             db.refresh(u)
             print(f"Zona creada: {direccion} (id {u.id})")
+        elif not dry_run and (float(u.latitud) != lat or float(u.longitud) != lng):
+            # La zona ya existía con otras coordenadas: se corrige el punto en el mapa.
+            u.latitud, u.longitud = lat, lng
+            if ciudades:
+                u.ciudad_id = min(ciudades, key=lambda c: (float(c.latitud) - lat) ** 2 + (float(c.longitud) - lng) ** 2).id
+            u.updated_at = datetime.now()
+            db.commit()
+            print(f"Zona reubicada: {direccion} -> {lat}, {lng}")
         mapa[direccion] = u.id
     if not mapa:
         raise SystemExit("No se pudieron preparar las zonas de captura.")
@@ -299,6 +311,35 @@ def limpiar_prueba(db) -> Dict[str, int]:
     return {"predicciones": pred, "imagenes": img}
 
 
+def limpiar_zonas_obsoletas(db) -> List[str]:
+    """Borra zonas y cámaras de corridas anteriores que ya no están en ZONAS y quedaron sin imágenes.
+
+    Nunca toca una ubicación que conserve imágenes (reales o de otra fuente).
+    """
+    direcciones = {direccion for _, direccion, _, _, _ in ZONAS}
+    nombres_camara = {nombre for _, _, nombre in PERFIL_ZONAS.values()}
+    borradas = []
+
+    def _borrar(modelo, fila, etiqueta):
+        """Borra la fila si nada más la referencia; si está en uso, la deja como está."""
+        try:
+            db.query(modelo).filter(modelo.id == fila.id).delete(synchronize_session=False)
+            db.commit()
+            borradas.append(etiqueta)
+        except IntegrityError:
+            db.rollback()  # otra tabla la referencia: se conserva
+
+    for u in db.query(Ubicacion).filter(Ubicacion.direccion.notin_(direcciones)).all():
+        if db.query(Imagen.id).filter(Imagen.ubicacion_id == u.id).first():
+            continue
+        _borrar(Ubicacion, u, u.direccion)
+    for d in db.query(DispositivoCaptura).filter(DispositivoCaptura.nombre_dispositivo.notin_(nombres_camara)).all():
+        if db.query(Imagen.id).filter(Imagen.dispositivo_captura_id == d.id).first():
+            continue
+        _borrar(DispositivoCaptura, d, d.nombre_dispositivo)
+    return borradas
+
+
 # --------------------------------------------------------------------------- generación
 
 def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_placas: bool = False) -> dict:
@@ -320,11 +361,18 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
     inicio = hoy - timedelta(days=30 * meses)
     ahora = datetime.now()
     dias = [inicio + timedelta(days=i) for i in range((hoy - inicio).days + 1)]
+
+    # Solo hay capturas en los días que hubo salida a campo, y dentro de esas horas.
+    obligatorias = tuple(VENTANA_CRITICA) + tuple(VENTANA_LIMPIA)
+    jornadas = planificar_jornadas(dias, rng, obligatorias)
+    dias_campo = [d for d in dias if d in jornadas]
+    if not dias_campo:
+        raise SystemExit("No se planificó ninguna jornada de campo; revisa PROB_SALIDA_DIA.")
     pesos_dia = [
-        DIA_PESO[d.weekday()] * (VOLUMEN_INICIAL + (VOLUMEN_FINAL - VOLUMEN_INICIAL) * i / max(len(dias) - 1, 1))
-        for i, d in enumerate(dias)
+        DIA_PESO[d.weekday()] * (VOLUMEN_INICIAL + (VOLUMEN_FINAL - VOLUMEN_INICIAL) * dias.index(d) / max(len(dias) - 1, 1))
+        for d in dias_campo
     ]
-    elegidos = rng.choices(dias, pesos_dia, k=cantidad)
+    elegidos = rng.choices(dias_campo, pesos_dia, k=cantidad)
 
     usadas: set = set()
     frecuentes = [_gen_placa(rng, usadas) for _ in range(N_PLACAS_FRECUENTES)]
@@ -339,18 +387,23 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
     registros: List[dict] = []
 
     for i, dia in enumerate(elegidos):
-        pesos_franja = HORA_PESO_MEDIA
+        horas_jornada = jornadas[dia]
         refuerzo = VENTANA_LIMPIA_VOLUMEN if dia.weekday() == 6 else VENTANA_CRITICA_VOLUMEN
-        if any(d == dia.weekday() for d, _ in refuerzo):
-            pesos_franja = [
-                w * refuerzo.get((dia.weekday(), (f * FRANJA_MIN) // 60), 1.0)
-                for f, w in enumerate(HORA_PESO_MEDIA)
-            ]
-        franja = rng.choices(range(len(HORA_PESO_MEDIA)), pesos_franja)[0]
+        # Solo las medias horas que caen dentro de la jornada de ese día.
+        franjas = [f for f in range(len(HORA_PESO_MEDIA)) if (f * FRANJA_MIN) // 60 in horas_jornada]
+        pesos_franja = [
+            HORA_PESO_MEDIA[f] * refuerzo.get((dia.weekday(), (f * FRANJA_MIN) // 60), 1.0)
+            for f in franjas
+        ]
+        franja = rng.choices(franjas, pesos_franja)[0]
         hora, minuto = divmod(franja * FRANJA_MIN + rng.randint(0, FRANJA_MIN - 1), 60)
         ts = datetime.combine(dia, time(hora, minuto, rng.randint(0, 59)))
         if ts > ahora:
-            ts -= timedelta(days=1)
+            # Fecha futura: se mueve a la jornada anterior que cubra esa misma hora.
+            previo = next((d for d in reversed(dias_campo) if d < dia and hora in jornadas[d]), None)
+            if previo is None:
+                previo = next((d for d in dias_campo if hora in jornadas[d]), dia)
+            ts = datetime.combine(previo, ts.time())
         hora = ts.hour
         clave = rng.choices(claves, pesos)[0]
         _, base, _ = PERFIL_ZONAS[clave]
@@ -481,11 +534,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.limpiar:
             print("Prueba eliminados:", limpiar_prueba(db))
             print("Demo eliminados:", clean_demo(db))
+            obsoletas = limpiar_zonas_obsoletas(db)
+            if obsoletas:
+                print("Zonas/cámaras obsoletas eliminadas:", ", ".join(obsoletas))
             return 0
         if not args.dry_run:
             asignar_ciudades_faltantes(db)
             print("Prueba anteriores eliminados:", limpiar_prueba(db))
             print("Demo anteriores eliminados:", clean_demo(db))
+            obsoletas = limpiar_zonas_obsoletas(db)
+            if obsoletas:
+                print("Zonas/cámaras obsoletas eliminadas:", ", ".join(obsoletas))
         r = generar(db, args.cantidad, args.meses, args.semilla, args.dry_run, args.con_placas)
         imprimir(r, args.dry_run)
         return 0

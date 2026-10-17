@@ -7,6 +7,7 @@ import AnalisisMasivo from './pages/AnalisisMasivo';
 import ProcesarCapturas from './pages/ProcesarCapturas';
 import HistorialOperador from './pages/HistorialOperador';
 import Navbar from './components/Navbar';
+import { PageBoundary } from './components/reports/ErrorBoundary';
 import FooterArt from './components/FooterArt';
 import IntroToLogin from './components/IntroToLogin';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -55,6 +56,7 @@ function AppContent() {
       {isAuthenticated && !presentacionActiva && <Navbar />}
       <main className={isAuthenticated ? 'pt-20' : ''}>
         <Suspense fallback={<PageSpinner />}>
+        <PageBoundary>
         <Routes>
                    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/captura" element={<ProtectedRoute allowedRoles={[ROLE_OPERADOR, ROLE_ANALISTA, ROLE_ADMIN, ROLE_DEV]}><Captura /></ProtectedRoute>} />
@@ -75,6 +77,7 @@ function AppContent() {
 
           <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
         </Routes>
+        </PageBoundary>
         </Suspense>
       </main>
       {isAuthenticated && !presentacionActiva && <FooterArt />}

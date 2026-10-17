@@ -106,6 +106,7 @@ def _ensure_image_row(
         fecha_subida=datetime.now(),
         usuario_id=user_id,
         ubicacion_id=ubicacion_id,
+        dispositivo_captura_id=dispositivo_id,
     )
     db.add(img)
     db.commit()
