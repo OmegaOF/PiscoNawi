@@ -13,3 +13,9 @@ CNN_MODEL_STEP_VERSION = os.getenv("CNN_MODEL_STEP_VERSION")
 CNN_MODEL_STEP_REASONING = os.getenv("CNN_MODEL_STEP_REASONING", "medium")
 CNN_MODEL_STEP_MAX_TOKENS = os.getenv("CNN_MODEL_STEP_MAX_TOKENS")
 PROCESS_WAVE_DEBUG = os.getenv("PROCESS_WAVE_DEBUG", "").strip().lower() in {"1", "true", "si", "sí", "yes"}
+
+CONFIANZA_ESCALA = 0.90
+
+
+def normalizar_confianza(valor: float) -> float:
+    return round(min(max(float(valor), 0.0), CONFIANZA_ESCALA), 4)

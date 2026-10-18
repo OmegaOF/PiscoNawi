@@ -11,6 +11,7 @@ from sqlalchemy import func
 
 from db import SessionLocal, Imagen, Prediccion, DispositivoCaptura
 from services.smog_model import predict_smog
+from services.config import normalizar_confianza
 
 # ======================
 # ESTADO GLOBAL
@@ -274,7 +275,7 @@ def _run_post_processing_analysis(db: Session, reanalizar: bool = False):
                 loop.close()
 
                 prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
-                confianza = resultado["nivel_confianza"] / 100.0
+                confianza = normalizar_confianza(resultado["nivel_confianza"] / 100.0)
                 prediccion.confianza = confianza
                 prediccion.p_smog = confianza
                 prediccion.observacion = MARCA_REVISADA

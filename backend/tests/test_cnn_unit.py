@@ -2,6 +2,7 @@ import numpy as np
 from PIL import Image
 
 from services import smog_model
+from services.config import CONFIANZA_ESCALA, normalizar_confianza
 from services.cnn_queue import get_status
 
 
@@ -53,7 +54,6 @@ def test_prediccion_smog_clasifica_como_no_smog(monkeypatch):
     result = smog_model.predict_smog("dummy.jpg")
 
     assert result["clase_predicha"] == "sin_smog"
-    # Sistema binario: p_smog guarda la misma confianza de la predicción.
     assert abs(result["p_smog"] - 0.90) < 1e-6
     assert abs(result["confianza"] - 0.90) < 1e-6
 
@@ -69,7 +69,8 @@ def test_prediccion_smog_limita_valores_fuera_de_rango(monkeypatch):
 
     result = smog_model.predict_smog("dummy.jpg")
 
-    assert result["p_smog"] == 1.0
+    assert result["p_smog"] == CONFIANZA_ESCALA
+    assert result["confianza"] == CONFIANZA_ESCALA
     assert result["clase_predicha"] == "smog"
 
 
@@ -108,3 +109,10 @@ def test_imagen_nueva_guarda_dispositivo_de_captura(db):
     repetida = _ensure_image_row(db, "/tmp/vehicle_4242.jpg", ubicacion_id=None, user_id=None, dispositivo_id=1)
     assert repetida.id == nueva.id
     assert repetida.dispositivo_captura_id == 1
+
+
+def test_normalizacion_de_confianza():
+    assert CONFIANZA_ESCALA == 0.90
+    assert normalizar_confianza(0.99) == CONFIANZA_ESCALA
+    assert normalizar_confianza(1.0) == CONFIANZA_ESCALA
+    assert normalizar_confianza(0.72) == 0.72

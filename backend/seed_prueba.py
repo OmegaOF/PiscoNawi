@@ -129,8 +129,7 @@ PERFIL_ZONAS = {
 }
 NOMBRE_CORTO = {direccion: corto for corto, direccion, _, _, _ in ZONAS}
 
-# Confianza del análisis (misma escala para ambas clases)
-CONFIANZA_MIN, CONFIANZA_MAX = 0.60, 0.97
+CONFIANZA_MIN, CONFIANZA_MAX = 0.60, 0.90
 
 # Una cámara por lugar: el tercer valor es el nombre del dispositivo que captura en esa zona.
 # Si no existe en la base, se crea con estas especificaciones.
@@ -435,7 +434,6 @@ def generar(db, cantidad: int, meses: int, semilla: int, dry_run: bool, con_plac
         es_smog = rng.random() < prob
 
         clase = "smog" if es_smog else "sin_smog"
-        # El sistema es binario: el único número es la confianza de la predicción.
         confianza = round(CONFIANZA_MIN + (CONFIANZA_MAX - CONFIANZA_MIN) * rng.betavariate(5, 2), 4)
         p = confianza
         nombre_zona = NOMBRE_CORTO.get(clave, str(clave))

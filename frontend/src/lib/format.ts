@@ -54,6 +54,34 @@ export function fmtDateTime(d: Date | string | null | undefined): string {
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
+/**
+ * Primer día (lunes) de una semana, con la misma convención que usa la base de datos:
+ * la semana 01 es la que contiene al 4 de enero, y cada semana empieza en lunes.
+ */
+function lunesDeSemana(anio: number, semana: number): Date {
+  const cuatroEnero = new Date(anio, 0, 4);
+  const diaSemana = (cuatroEnero.getDay() + 6) % 7; // 0 = lunes
+  const lunesSemana1 = new Date(anio, 0, 4 - diaSemana);
+  return new Date(lunesSemana1.getFullYear(), lunesSemana1.getMonth(), lunesSemana1.getDate() + (semana - 1) * 7);
+}
+
+/** Rango de fechas de una semana, p. ej. "5 – 11 oct 2026". */
+export function rangoSemana(periodo: string): string | null {
+  const [a, w] = periodo.split('-');
+  const anio = Number(a);
+  const semana = Number(w);
+  if (!Number.isFinite(anio) || !Number.isFinite(semana)) return null;
+  const inicio = lunesDeSemana(anio, semana);
+  const fin = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + 6);
+  const mesInicio = MESES[inicio.getMonth()];
+  const mesFin = MESES[fin.getMonth()];
+  if (inicio.getMonth() === fin.getMonth()) {
+    return `${inicio.getDate()} – ${fin.getDate()} ${mesFin} ${fin.getFullYear()}`;
+  }
+  const anioInicio = inicio.getFullYear() !== fin.getFullYear() ? ` ${inicio.getFullYear()}` : '';
+  return `${inicio.getDate()} ${mesInicio}${anioInicio} – ${fin.getDate()} ${mesFin} ${fin.getFullYear()}`;
+}
+
 /** Etiqueta legible para un período del backend según la agrupación. */
 export function fmtPeriodo(periodo: string, agrupar: 'dia' | 'semana' | 'mes'): string {
   if (agrupar === 'mes') {
@@ -66,6 +94,14 @@ export function fmtPeriodo(periodo: string, agrupar: 'dia' | 'semana' | 'mes'): 
   }
   const d = parseLocal(periodo);
   return d ? `${d.getDate()} ${MESES[d.getMonth()]}` : periodo;
+}
+
+/** Etiqueta para tooltips: en semanas añade el rango de fechas entre paréntesis. */
+export function fmtPeriodoDetalle(periodo: string, agrupar: 'dia' | 'semana' | 'mes'): string {
+  const base = fmtPeriodo(periodo, agrupar);
+  if (agrupar !== 'semana') return base;
+  const rango = rangoSemana(periodo);
+  return rango ? `${base} (${rango})` : base;
 }
 
 export function formatBytes(n: number | null | undefined): string {

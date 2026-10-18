@@ -9,6 +9,7 @@ try:
     import tensorflow as tf
 except ImportError:
     tf = None
+from services.config import CONFIANZA_ESCALA
 from PIL import Image
 
 # Carga única del modelo
@@ -50,7 +51,7 @@ def predict_smog(image_path: str) -> dict:
     if modo_simulado():
         p = max(0.0, min(1.0, DEBUG_P))
         clase = "smog" if p >= 0.5 else "sin_smog"
-        confianza = max(p, 1.0 - p)
+        confianza = min(max(p, 1.0 - p), CONFIANZA_ESCALA)
         return {
             "clase_predicha": clase,
             "p_smog": confianza,
@@ -69,7 +70,7 @@ def predict_smog(image_path: str) -> dict:
     p = max(0.0, min(1.0, p))
 
     clase = "smog" if p >= 0.5 else "sin_smog"
-    confianza = max(p, 1.0 - p)
+    confianza = min(max(p, 1.0 - p), CONFIANZA_ESCALA)
 
     return {
         "clase_predicha": clase,

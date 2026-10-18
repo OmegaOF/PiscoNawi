@@ -3,7 +3,7 @@ import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 import { ChartCtx } from './chartTheme';
 import { Agrupar, Bucket, DispositivoItem, HeatCell, TendenciaItem, UsuarioItem, ZonaItem } from './reportsApi';
-import { DIAS_CORTOS, fmtDate, fmtHora, fmtInt, fmtNum, fmtPct, fmtPeriodo, hexA } from './format';
+import { DIAS_CORTOS, fmtDate, fmtHora, fmtInt, fmtNum, fmtPct, fmtPeriodo, fmtPeriodoDetalle, hexA } from './format';
 import { etiquetaZona, nivelSmog, UMBRAL_ALTO, UMBRAL_MODERADO } from './smog';
 
 const tip = (rows: string[]) => rows.join('<br/>');
@@ -57,6 +57,8 @@ export function gaugeOption(pct: number, ctx: ChartCtx): EChartsOption {
 // --- Evolución temporal ----------------------------------------------------
 export function trendOption(rows: TendenciaItem[], imgRows: TendenciaItem[] | null, agrupar: Agrupar, ctx: ChartCtx, stacked: boolean): EChartsOption {
   const labels = rows.map((r) => fmtPeriodo(r.periodo, agrupar));
+  // En el eje va la etiqueta corta; en el tooltip, con el rango de fechas de la semana.
+  const titulos = rows.map((r) => fmtPeriodoDetalle(r.periodo, agrupar));
   const imgMap = new Map((imgRows || []).map((r) => [r.periodo, r.total]));
   const area = (c: string, a1: number) =>
     new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -127,7 +129,7 @@ export function trendOption(rows: TendenciaItem[], imgRows: TendenciaItem[] | nu
         const r = rows[i];
         const pct = r && r.total ? (r.smog / r.total) * 100 : 0;
         return tip([
-          `<b>${labels[i]}</b>`,
+          `<b>${titulos[i] ?? labels[i]}</b>`,
           ...list.map((p: any) => `${dot(p.color)}${p.seriesName}: <b>${fmtInt(p.value)}</b>`),
           `Total: <b>${fmtInt(r?.total)}</b> · ${fmtPct(pct)} con smog`,
         ]);

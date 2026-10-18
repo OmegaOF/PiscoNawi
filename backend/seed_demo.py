@@ -120,7 +120,7 @@ PROB_SALIDA_DIA = [0.70, 0.45, 0.75, 0.40, 0.65, 0.45, 0.80]
 # Bloques de horas seguidas que dura una jornada (p. ej. 2 a 4 horas de pie en la avenida).
 BLOQUES_POR_JORNADA = (1, 2)      # cuántos tramos separados por día
 HORAS_POR_BLOQUE = (2, 4)         # duración de cada tramo, en horas
-CONFIANZA_MIN, CONFIANZA_MAX = 0.60, 0.97
+CONFIANZA_MIN, CONFIANZA_MAX = 0.60, 0.90
 
 USUARIOS_PESO = {
     "operador@pisco.local": 0.45,
@@ -333,7 +333,6 @@ def run_seed(
         es_smog = rng.random() < prob
 
         clase = "smog" if es_smog else "sin_smog"
-        # Sistema binario: el único número es la confianza de la predicción.
         confianza = round(CONFIANZA_MIN + (CONFIANZA_MAX - CONFIANZA_MIN) * rng.betavariate(5, 2), 4)
         p = confianza
         fname = rng.choice(pool_smog if es_smog else pool_sin)

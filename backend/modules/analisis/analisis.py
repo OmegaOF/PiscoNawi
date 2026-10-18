@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from datetime import datetime, date
 
 from services.cnn_queue import start_queue, get_status
+from services.config import normalizar_confianza
 from modules.roles.roles import require_roles, require_internal_user
 from db import get_db, Usuario, Imagen, Prediccion, Ubicacion, Ciudad, DispositivoCaptura
 router = APIRouter()
@@ -100,7 +101,7 @@ async def analizar_con_ia(
     try:
         resultado = await analizar_imagen_cnn_model_step(imagen.ruta_archivo)
         prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
-        confianza = resultado["nivel_confianza"] / 100.0
+        confianza = normalizar_confianza(resultado["nivel_confianza"] / 100.0)
         prediccion.confianza = confianza
         prediccion.p_smog = confianza
         prediccion.observacion = '-'
@@ -299,7 +300,7 @@ async def analizar_todas_imagenes_hoy(
 
             resultado = await analizar_imagen_cnn_model_step(imagen.ruta_archivo)
             prediccion.clase_predicha = "smog" if resultado["smog_visible"] else "sin_smog"
-            confianza = resultado["nivel_confianza"] / 100.0
+            confianza = normalizar_confianza(resultado["nivel_confianza"] / 100.0)
             prediccion.confianza = confianza
             prediccion.p_smog = confianza
             prediccion.observacion = MARCA_REVISADA

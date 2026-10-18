@@ -291,9 +291,12 @@ BUCKETS = [(0.0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.01)]
 
 
 def fetch_distribucion(db: Session, f: ReportFilters, column) -> List[HistogramBucket]:
+    maximo = f.apply_pred(db.query(func.max(column))).scalar()
+    limite = float(maximo) if maximo is not None else 1.0
     result = []
     for low, high in BUCKETS:
-        label = f"{low:.1f}-{high:.1f}" if high <= 1.0 else "0.8-1.0"
+        ultimo = high > 1.0
+        label = f"{low:.1f}-{max(limite, low):.2f}" if ultimo else f"{low:.1f}-{high:.1f}"
         q = db.query(func.count(Prediccion.id)).filter(column >= low, column < high)
         result.append(HistogramBucket(rango=label, cantidad=f.apply_pred(q).scalar() or 0))
     return result

@@ -5,7 +5,7 @@ import { SectionProps } from './types';
 import ChartCard from '../../../components/reports/ChartCard';
 import { useSurface } from '../../../components/reports/surface';
 import { usePresentation } from '../../../contexts/PresentationContext';
-import { fmtInt, fmtNum, fmtPct, fmtPeriodo } from '../../../lib/format';
+import { fmtInt, fmtNum, fmtPct, fmtPeriodo, fmtPeriodoDetalle } from '../../../lib/format';
 import { nivelSmog } from '../../../lib/smog';
 import { LEVEL_COLORS } from '../../../lib/chartCtx';
 import { cx } from '../../../lib/cx';
@@ -23,7 +23,7 @@ const TablaSection: React.FC<SectionProps> = ({ data, filters }) => {
     const dec = (n: number, d = 2) => n.toFixed(d).replace('.', ',');
     const lines = [
       ['Período', 'Predicciones', 'Con smog', '% con smog', 'Confianza promedio (%)'].join(';'),
-      ...rows.map((r) => [fmtPeriodo(r.periodo, filters.agrupar), r.total_predicciones, r.total_smog, dec(r.pct_smog), dec(r.confianza_promedio * 100)].join(';')),
+      ...rows.map((r) => [fmtPeriodoDetalle(r.periodo, filters.agrupar), r.total_predicciones, r.total_smog, dec(r.pct_smog), dec(r.confianza_promedio * 100)].join(';')),
     ];
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -76,7 +76,9 @@ const TablaSection: React.FC<SectionProps> = ({ data, filters }) => {
                 const color = LEVEL_COLORS[nivelSmog(r.pct_smog, r.total_smog)][s.dark ? 'dark' : 'light'];
                 return (
                   <tr key={r.periodo} className={s.hover}>
-                    <td className="px-4 py-2.5 font-medium">{fmtPeriodo(r.periodo, filters.agrupar)}</td>
+                    <td className="px-4 py-2.5 font-medium" title={fmtPeriodoDetalle(r.periodo, filters.agrupar)}>
+                      {fmtPeriodo(r.periodo, filters.agrupar)}
+                    </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtInt(r.total_predicciones)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{fmtInt(r.total_smog)}</td>
                     <td className="px-4 py-2.5">
